@@ -1,0 +1,8 @@
+import { HttpResponse } from 'msw'
+import type { ApiErrorBody, ApiErrorCode } from '@/lib/api/errors'
+
+const apiError = (status: number, code: ApiErrorCode, message: string, fieldErrors?: Record<string, string>) =>
+  HttpResponse.json<ApiErrorBody>({ code, message, ...(fieldErrors && { fieldErrors }) }, { status })
+
+export const validationError = (fieldErrors: Record<string, string>, message = 'Parâmetros inválidos.') =>
+  apiError(422, 'VALIDATION_ERROR', message, fieldErrors)
