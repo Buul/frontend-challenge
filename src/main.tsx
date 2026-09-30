@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { createRouter, RouterProvider } from '@tanstack/react-router'
+import { createRouter, parseSearchWith, RouterProvider, stringifySearchWith } from '@tanstack/react-router'
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { ApiError } from './lib/api/errors'
@@ -18,6 +18,10 @@ const queryClient = new QueryClient({
 const router = createRouter({
   routeTree,
   context: { queryClient },
+  // Search values stay raw strings (no JSON coercion) so ETH decimals keep full precision;
+  // each route's validateSearch is responsible for parsing them.
+  parseSearch: parseSearchWith((value) => value),
+  stringifySearch: stringifySearchWith(JSON.stringify),
   defaultPreload: 'intent',
   defaultPreloadStaleTime: 0,
   scrollRestoration: true,
