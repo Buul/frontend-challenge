@@ -1,4 +1,4 @@
-# Vite Pulse
+# Frontend Challenge
 
 Base limpa com a stack abaixo já configurada e integrada, pronta para começar a implementar.
 
