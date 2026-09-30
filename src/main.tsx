@@ -1,8 +1,8 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { createRouter, RouterProvider } from '@tanstack/react-router'
-import { isAxiosError } from 'axios'
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
+import { ApiError } from './lib/api/errors'
 import { routeTree } from './routeTree.gen'
 import './index.css'
 
@@ -10,10 +10,7 @@ const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       staleTime: 30_000,
-      retry: (failureCount, error) => {
-        const status = isAxiosError(error) ? error.response?.status : undefined
-        return failureCount < 2 && !(status && status >= 400 && status < 500)
-      },
+      retry: (failureCount, error) => failureCount < 2 && error instanceof ApiError && error.retryable,
     },
   },
 })
