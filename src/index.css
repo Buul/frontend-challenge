@@ -28,6 +28,7 @@
     --color-brand: var(--brand);
     --color-tertiary: var(--tertiary);
     --color-surface-dark: var(--surface-dark);
+    --color-surface-raised: var(--surface-raised);
     --radius-sm: calc(var(--radius) * 0.6);
     --radius-md: calc(var(--radius) * 0.8);
     --radius-lg: var(--radius);
@@ -62,6 +63,7 @@
     --brand: #e89b55;
     --tertiary: #b39463;
     --surface-dark: #38220f;
+    --surface-raised: #2f1d15;
 }
 
 @layer base {

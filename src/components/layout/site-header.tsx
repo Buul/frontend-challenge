@@ -1,9 +1,10 @@
-import { Link, useNavigate, useSearch } from '@tanstack/react-router'
+import { Link, useSearch } from '@tanstack/react-router'
 import { useRef, useState } from 'react'
 import cartIcon from '@/assets/figma/cart.svg'
 import loginIcon from '@/assets/figma/login.svg'
 import searchIcon from '@/assets/figma/search.svg'
 import { Button } from '@/components/ui/button'
+import { useSearchSubmit } from '@/hooks/use-search-submit'
 import { NFT_SEARCH_MAX_LENGTH } from '@/lib/api/types'
 
 // Sections without a `hash` have no destination yet, so they render as plain text instead of dead links.
@@ -13,8 +14,19 @@ const NAV_SECTIONS: { label: string; hash?: string }[] = [
   { label: 'Aprenda', hash: 'blog' },
 ]
 
+export function SkipLink() {
+  return (
+    <a
+      href="#conteudo"
+      className="sr-only rounded-md bg-primary px-4 py-2 font-bold text-primary-foreground focus:not-sr-only focus:fixed focus:top-4 focus:left-4 focus:z-50"
+    >
+      Pular para o conteúdo
+    </a>
+  )
+}
+
 function HeaderSearch() {
-  const navigate = useNavigate()
+  const onSubmit = useSearchSubmit()
   const { q } = useSearch({ strict: false })
   const [open, setOpen] = useState(Boolean(q))
   const toggle = useRef<HTMLButtonElement>(null)
@@ -25,19 +37,7 @@ function HeaderSearch() {
   }
 
   return (
-    <form
-      role="search"
-      className="flex items-center gap-2"
-      onSubmit={(event) => {
-        event.preventDefault()
-        const value = String(new FormData(event.currentTarget).get('q') ?? '').trim()
-        void navigate({
-          to: '/',
-          search: (prev) => ({ ...prev, q: value || undefined, page: undefined }),
-          hash: 'mercado',
-        })
-      }}
-    >
+    <form role="search" className="flex items-center gap-2" onSubmit={onSubmit}>
       {open && (
         <>
           <label htmlFor="site-search" className="sr-only">
@@ -73,12 +73,7 @@ function HeaderSearch() {
 export function SiteHeader({ cartCount = 0 }: { cartCount?: number }) {
   return (
     <header className="border-b-[0.3px] border-primary">
-      <a
-        href="#conteudo"
-        className="sr-only rounded-md bg-primary px-4 py-2 font-bold text-primary-foreground focus:not-sr-only focus:fixed focus:top-4 focus:left-4 focus:z-50"
-      >
-        Pular para o conteúdo
-      </a>
+      <SkipLink />
       <div className="flex flex-wrap items-start justify-between gap-y-4">
         <Link to="/" className="w-40 py-2 text-sm font-bold tracking-[1.4px]" aria-label="Kurio, página inicial">
           KURIO

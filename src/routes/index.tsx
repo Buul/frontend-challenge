@@ -5,12 +5,16 @@ import { Blog } from '@/components/home/blog'
 import { FeaturedBanner } from '@/components/home/featured-banner'
 import { FiltersPanel } from '@/components/home/filters-panel'
 import { Hero } from '@/components/home/hero'
-import { NftGrid } from '@/components/home/nft-grid'
+import { MobileHero } from '@/components/home/mobile-hero'
+import { MobileSearchBar } from '@/components/home/mobile-search-bar'
+import { NftGrid, SortSelect } from '@/components/home/nft-grid'
 import { Promos } from '@/components/home/promos'
+import { MOBILE_TAB_BAR_HEIGHT, MobileTabBar } from '@/components/layout/mobile-tab-bar'
 import { SiteFooter } from '@/components/layout/site-footer'
 import { SiteHeader } from '@/components/layout/site-header'
+import { useIsMobile } from '@/hooks/use-media-query'
 import { featuredNftsQueryOptions, nftFacetsQueryOptions, nftListQueryOptions } from '@/lib/api/nfts'
-import { COLLECTIONS, NETWORKS, NFT_SEARCH_MAX_LENGTH, NFT_SORTS, NFT_TABS, type NftQuery } from '@/lib/api/types'
+import { COLLECTIONS, NETWORKS, NFT_SEARCH_MAX_LENGTH, NFT_SORTS, NFT_TABS, type NftQuery, type NftSort } from '@/lib/api/types'
 import { compareEth, isEthAmount, normalizeEth } from '@/lib/eth'
 
 const pick = <T extends string>(options: readonly { id: T }[], value: unknown) =>
@@ -79,6 +83,7 @@ function Home() {
   const search = Route.useSearch()
   const navigate = Route.useNavigate()
   const query = toQuery(search)
+  const isMobile = useIsMobile()
 
   const featured = useQuery(featuredNftsQueryOptions())
   const facets = useQuery(nftFacetsQueryOptions())
@@ -97,44 +102,71 @@ function Home() {
   }, [lastPage, navigate])
 
   const hasFilters = Boolean(search.q || search.collection || search.network || search.minPrice || search.maxPrice)
+  const activeFilters = [search.collection, search.network, search.minPrice || search.maxPrice].filter(Boolean).length
+
+  const filtersPanel = (
+    <FiltersPanel
+      facets={facets.data}
+      collection={search.collection}
+      network={search.network}
+      minPrice={search.minPrice}
+      maxPrice={search.maxPrice}
+      onChange={(patch) => update(patch)}
+    />
+  )
+  const onSortChange = (sort: NftSort) => update({ sort: sort === 'recent' ? undefined : sort })
+  const heroProps = { slides: featured.data, isError: featured.isError, onRetry: () => void featured.refetch() }
 
   return (
-    <div className="mx-auto flex max-w-[1440px] flex-col gap-8 px-4 py-6 sm:px-8 xl:px-[120px]">
-      <SiteHeader />
-      <main id="conteudo" tabIndex={-1} className="flex flex-col gap-24 outline-none">
-        <Hero slides={featured.data} isError={featured.isError} onRetry={() => void featured.refetch()} />
+    <div
+      className="mx-auto flex max-w-[1440px] flex-col gap-4 px-6 pt-10 md:gap-8 md:px-8 md:py-6 xl:px-[120px]"
+      style={isMobile ? { paddingBottom: MOBILE_TAB_BAR_HEIGHT } : undefined}
+    >
+      {isMobile ? (
+        <MobileSearchBar
+          activeFilters={activeFilters}
+          filters={
+            <div className="flex flex-col">
+              <SortSelect sort={query.sort} onSortChange={onSortChange} className="px-5 py-3" />
+              {filtersPanel}
+            </div>
+          }
+        />
+      ) : (
+        <SiteHeader />
+      )}
+      <main id="conteudo" tabIndex={-1} className="flex flex-col gap-16 outline-none md:gap-24">
+        <div className="flex flex-col gap-4 md:contents">
+          {isMobile ? <MobileHero {...heroProps} /> : <Hero {...heroProps} />}
 
-        <div className="flex flex-col gap-12 lg:flex-row lg:items-start">
-          <div className="flex flex-col gap-6 lg:w-[310px] lg:shrink-0">
-            <FiltersPanel
-              facets={facets.data}
-              collection={search.collection}
-              network={search.network}
-              minPrice={search.minPrice}
-              maxPrice={search.maxPrice}
-              onChange={(patch) => update(patch)}
+          <div className="flex flex-col gap-12 lg:flex-row lg:items-start">
+            {!isMobile && (
+              <div className="flex flex-col gap-6 lg:w-[310px] lg:shrink-0">
+                {filtersPanel}
+                <FeaturedBanner />
+              </div>
+            )}
+            <NftGrid
+              tab={query.tab}
+              sort={query.sort}
+              result={list.data}
+              isFetching={list.isFetching}
+              isError={list.isError && !list.data}
+              hasFilters={hasFilters}
+              onTabChange={(tab) => update(tab === 'all' ? { ...CLEARED_FILTERS, tab: undefined } : { tab })}
+              onSortChange={onSortChange}
+              onPageChange={(page) => update({ page: page === 1 ? undefined : page }, false)}
+              onRetry={() => void list.refetch()}
+              onClearFilters={() => update(CLEARED_FILTERS)}
             />
-            <FeaturedBanner />
           </div>
-          <NftGrid
-            tab={query.tab}
-            sort={query.sort}
-            result={list.data}
-            isFetching={list.isFetching}
-            isError={list.isError && !list.data}
-            hasFilters={hasFilters}
-            onTabChange={(tab) => update(tab === 'all' ? { ...CLEARED_FILTERS, tab: undefined } : { tab })}
-            onSortChange={(sort) => update({ sort: sort === 'recent' ? undefined : sort })}
-            onPageChange={(page) => update({ page: page === 1 ? undefined : page }, false)}
-            onRetry={() => void list.refetch()}
-            onClearFilters={() => update(CLEARED_FILTERS)}
-          />
         </div>
 
         <Promos />
         <Blog />
       </main>
       <SiteFooter className="mt-16" />
+      {isMobile && <MobileTabBar />}
     </div>
   )
 }

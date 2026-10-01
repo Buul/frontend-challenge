@@ -10,7 +10,17 @@ type HeroProps = {
   onRetry: () => void
 }
 
-function SlideDots({ slides, active, onSelect }: { slides: FeaturedNft[]; active: number; onSelect: (index: number) => void }) {
+export function SlideDots({
+  slides,
+  active,
+  onSelect,
+  compact = false,
+}: {
+  slides: FeaturedNft[]
+  active: number
+  onSelect: (index: number) => void
+  compact?: boolean
+}) {
   const buttons = useRef<(HTMLButtonElement | null)[]>([])
 
   const handleKeyDown = (event: KeyboardEvent) => {
@@ -28,7 +38,7 @@ function SlideDots({ slides, active, onSelect }: { slides: FeaturedNft[]; active
   }
 
   return (
-    <div role="group" aria-label="Escolher NFT em destaque" className="flex h-6" onKeyDown={handleKeyDown}>
+    <div role="group" aria-label="Escolher NFT em destaque" className={cn('flex', compact ? 'h-[7px]' : 'h-6')} onKeyDown={handleKeyDown}>
       {slides.map((slide, index) => (
         <button
           key={slide.id}
@@ -40,12 +50,16 @@ function SlideDots({ slides, active, onSelect }: { slides: FeaturedNft[]; active
           aria-label={`Destaque ${index + 1} de ${slides.length}: ${slide.name}`}
           aria-current={index === active ? 'true' : undefined}
           onClick={() => onSelect(index)}
-          className="group flex items-center rounded-full px-1"
+          className={cn(
+            'group relative flex items-center rounded-full',
+            compact ? 'px-[3px] before:absolute before:-inset-2' : 'px-1',
+          )}
         >
           <span
             className={cn(
-              'block h-2 rounded-full bg-primary transition-all motion-reduce:transition-none',
-              index === active ? 'w-5' : 'w-2 opacity-40 group-hover:opacity-80',
+              'block rounded-full bg-primary transition-all motion-reduce:transition-none',
+              compact ? 'size-[7px]' : index === active ? 'h-2 w-5' : 'h-2 w-2',
+              index !== active && 'opacity-40 group-hover:opacity-80',
             )}
           />
         </button>

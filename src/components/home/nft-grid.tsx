@@ -21,20 +21,25 @@ type NftGridProps = {
 
 function NftCard({ nft }: { nft: Nft }) {
   return (
-    <article className="flex flex-col gap-3">
-      <div className="flex h-[300px] items-center justify-center bg-card px-1">
+    <article className="flex flex-col gap-2 md:gap-3">
+      <div className="relative flex aspect-[175/200] items-center justify-center overflow-hidden rounded-[20px] bg-[linear-gradient(139.5deg,var(--card)_12%,var(--surface-raised)_106.6%)] px-1 md:aspect-auto md:h-[300px] md:rounded-none md:bg-card md:bg-none">
         <img
           src={nft.image}
           alt={nft.name}
           width={250}
           height={250}
           loading="lazy"
-          className="aspect-square w-full max-w-[250px] rounded-[15px] object-cover"
+          className="aspect-square w-full max-w-[168px] rounded-2xl object-cover md:max-w-[250px] md:rounded-[15px]"
         />
+        {nft.isRare && (
+          <span className="absolute top-4 left-0 flex h-8 w-[68px] items-center bg-primary px-2 text-[13px] leading-4 font-medium text-primary-foreground">
+            RARO
+          </span>
+        )}
       </div>
-      <div className="flex flex-col gap-1.5 leading-4">
-        <h3 className="text-base">{nft.name}</h3>
-        <p className="flex items-center gap-3 text-lg">
+      <div className="flex flex-col leading-4 max-md:pl-2 md:gap-1.5">
+        <h3 className="text-[15px] leading-normal md:text-base md:leading-4">{nft.name}</h3>
+        <p className="flex flex-wrap items-center gap-x-3 text-base md:text-lg">
           <span className="font-bold text-brand">{formatEth(nft.price)}</span>
           {nft.previousPrice !== undefined && (
             <span className="text-tertiary">
@@ -50,11 +55,33 @@ function NftCard({ nft }: { nft: Nft }) {
 
 function CardSkeleton() {
   return (
-    <div className="flex flex-col gap-3" aria-hidden>
-      <div className="h-[300px] animate-pulse bg-card motion-reduce:animate-none" />
+    <div className="flex flex-col gap-2 md:gap-3" aria-hidden>
+      <div className="aspect-[175/200] animate-pulse rounded-[20px] bg-card motion-reduce:animate-none md:aspect-auto md:h-[300px] md:rounded-none" />
       <div className="h-4 w-2/3 animate-pulse rounded bg-card motion-reduce:animate-none" />
       <div className="h-4 w-1/3 animate-pulse rounded bg-card motion-reduce:animate-none" />
     </div>
+  )
+}
+
+export function SortSelect({ sort, onSortChange, className }: { sort: NftSort; onSortChange: (sort: NftSort) => void; className?: string }) {
+  return (
+    <label className={cn('flex items-center gap-2 text-[15px]', className)}>
+      Ordenar por:
+      <span className="relative flex items-center">
+        <select
+          value={sort}
+          onChange={(event) => onSortChange(event.target.value as NftSort)}
+          className="cursor-pointer appearance-none rounded-sm bg-transparent pr-7 outline-offset-2"
+        >
+          {NFT_SORTS.map(({ id, label }) => (
+            <option key={id} value={id} className="bg-card">
+              {label}
+            </option>
+          ))}
+        </select>
+        <img src={arrowDown} alt="" width={11} height={6} className="pointer-events-none absolute right-1" />
+      </span>
+    </label>
   )
 }
 
@@ -102,7 +129,7 @@ export function NftGrid({
   onClearFilters,
 }: NftGridProps) {
   return (
-    <section id="mercado" aria-labelledby="market-title" className="flex min-w-0 flex-1 flex-col gap-[88px]">
+    <section id="mercado" aria-labelledby="market-title" className="flex min-w-0 flex-1 flex-col gap-10 md:gap-[88px]">
       <h2 id="market-title" className="sr-only">
         Mercado de NFTs
       </h2>
@@ -111,9 +138,13 @@ export function NftGrid({
           ? 'Carregando NFTs…'
           : `${result.total} ${result.total === 1 ? 'NFT encontrado' : 'NFTs encontrados'}, página ${result.page} de ${result.totalPages}.`}
       </p>
-      <div className="flex flex-col gap-8">
+      <div className="flex flex-col gap-4 md:gap-8">
         <div className="flex flex-wrap items-center justify-between gap-4">
-          <div role="group" aria-label="Categorias" className="flex gap-5 overflow-x-auto pb-2 text-[15px] leading-4 font-medium">
+          <div
+            role="group"
+            aria-label="Categorias"
+            className="flex gap-4 overflow-x-auto pb-2 text-sm leading-4 [scrollbar-width:none] md:gap-5 md:text-[15px] md:font-medium"
+          >
             {NFT_TABS.map(({ id, label }) => (
               <button
                 key={id}
@@ -122,7 +153,8 @@ export function NftGrid({
                 onClick={() => onTabChange(id)}
                 className={cn(
                   'relative whitespace-nowrap transition-colors hover:text-brand',
-                  tab === id && 'text-brand after:absolute after:inset-x-0 after:-bottom-[7px] after:h-0.5 after:bg-primary',
+                  tab === id &&
+                    'font-bold text-brand after:absolute after:inset-x-0 after:-bottom-1.5 after:h-0.5 after:bg-primary md:font-medium md:after:-bottom-[7px]',
                 )}
               >
                 {label}
@@ -130,23 +162,7 @@ export function NftGrid({
             ))}
           </div>
 
-          <label className="flex items-center gap-2 text-[15px]">
-            Ordenar por:
-            <span className="relative flex items-center">
-              <select
-                value={sort}
-                onChange={(event) => onSortChange(event.target.value as NftSort)}
-                className="cursor-pointer appearance-none rounded-sm bg-transparent pr-7 outline-offset-2"
-              >
-                {NFT_SORTS.map(({ id, label }) => (
-                  <option key={id} value={id} className="bg-card">
-                    {label}
-                  </option>
-                ))}
-              </select>
-              <img src={arrowDown} alt="" width={11} height={6} className="pointer-events-none absolute right-1" />
-            </span>
-          </label>
+          <SortSelect sort={sort} onSortChange={onSortChange} className="max-md:hidden" />
         </div>
 
         {isError ? (
@@ -169,7 +185,9 @@ export function NftGrid({
           <div
             aria-busy={isFetching}
             className={cn(
-              'grid gap-x-6 gap-y-[72px] sm:grid-cols-2 xl:grid-cols-[repeat(3,258px)] xl:justify-between',
+              // Mobile staggers the right column 32px down, as in the design.
+              'grid grid-cols-2 gap-x-4 gap-y-6 pb-8 [&>*:nth-child(even)]:translate-y-8',
+              'md:gap-x-6 md:gap-y-[72px] md:pb-0 md:[&>*:nth-child(even)]:translate-y-0 xl:grid-cols-[repeat(3,258px)] xl:justify-between',
               isFetching && result && 'opacity-60 transition-opacity',
             )}
           >
