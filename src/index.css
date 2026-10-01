@@ -75,6 +75,10 @@
     --surface-raised: #2f1d15;
 }
 
+@utility hairline-b {
+  border-bottom: 0.3px solid var(--primary);
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;

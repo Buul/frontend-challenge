@@ -4,9 +4,11 @@ import cartIcon from '@/assets/figma/cart.svg'
 import loginIcon from '@/assets/figma/login.svg'
 import searchIcon from '@/assets/figma/search.svg'
 import { AccountMenu } from '@/components/auth/account-menu'
+import { NftSearchField } from '@/components/layout/nft-search-field'
+import { SkipLink } from '@/components/layout/skip-link'
 import { Button } from '@/components/ui/button'
+import { cartLabel, CountBadge } from '@/components/ui/count-badge'
 import { useSearchSubmit } from '@/hooks/use-search-submit'
-import { NFT_SEARCH_MAX_LENGTH } from '@/lib/api/types'
 
 export type NavSection = 'home' | 'market'
 
@@ -23,17 +25,6 @@ const navItemClass = (active: boolean) =>
     ? 'flex flex-col gap-6 font-bold whitespace-nowrap text-brand after:h-[3px] after:w-full after:bg-primary'
     : 'pb-[27px] whitespace-nowrap'
 
-export function SkipLink() {
-  return (
-    <a
-      href="#conteudo"
-      className="sr-only rounded-md bg-primary px-4 py-2 font-bold text-primary-foreground focus:not-sr-only focus:fixed focus:top-4 focus:left-4 focus:z-50"
-    >
-      Pular para o conteúdo
-    </a>
-  )
-}
-
 function HeaderSearch() {
   const onSubmit = useSearchSubmit()
   const { q } = useSearch({ strict: false })
@@ -48,23 +39,13 @@ function HeaderSearch() {
   return (
     <form role="search" className="flex items-center gap-2" onSubmit={onSubmit}>
       {open && (
-        <>
-          <label htmlFor="site-search" className="sr-only">
-            Buscar NFTs por nome
-          </label>
-          <input
-            key={q}
-            id="site-search"
-            name="q"
-            type="search"
-            defaultValue={q}
-            maxLength={NFT_SEARCH_MAX_LENGTH}
-            autoFocus
-            placeholder="Buscar NFTs..."
-            onKeyDown={(event) => event.key === 'Escape' && close()}
-            className="h-[35px] w-40 rounded-md bg-card px-3 text-sm outline-none placeholder:text-tertiary focus-visible:ring-2 focus-visible:ring-ring sm:w-56"
-          />
-        </>
+        <NftSearchField
+          id="site-search"
+          autoFocus
+          placeholder="Buscar NFTs..."
+          onEscape={close}
+          className="h-[35px] w-40 rounded-md bg-card px-3 text-sm outline-none placeholder:text-tertiary focus-visible:ring-2 focus-visible:ring-ring sm:w-56"
+        />
       )}
       <button
         ref={toggle}
@@ -89,7 +70,7 @@ type SiteHeaderProps = {
 
 export function SiteHeader({ cartCount = 0, active = 'home', bordered = true }: SiteHeaderProps) {
   return (
-    <header className={bordered ? 'border-b-[0.3px] border-primary' : undefined}>
+    <header className={bordered ? 'hairline-b' : undefined}>
       <SkipLink />
       <div className="flex flex-wrap items-start justify-between gap-y-4">
         <Link to="/" className="w-40 py-2 text-sm font-bold tracking-[1.4px]" aria-label="Kurio, página inicial">
@@ -122,20 +103,9 @@ export function SiteHeader({ cartCount = 0, active = 'home', bordered = true }: 
 
         <div className="flex items-center gap-7">
           <HeaderSearch />
-          <button
-            type="button"
-            aria-label={cartCount > 0 ? `Carrinho, ${cartCount} itens` : 'Carrinho vazio'}
-            className="relative rounded-sm hover:opacity-80"
-          >
+          <button type="button" aria-label={cartLabel(cartCount)} className="relative rounded-sm hover:opacity-80">
             <img src={cartIcon} alt="" width={24} height={24} />
-            {cartCount > 0 && (
-              <span
-                aria-hidden
-                className="absolute top-0 left-[15px] grid size-4 place-items-center rounded-full bg-primary text-[10px] leading-none font-medium text-primary-foreground ring-2 ring-background"
-              >
-                {cartCount}
-              </span>
-            )}
+            <CountBadge count={cartCount} className="absolute top-0 left-[15px] bg-primary" />
           </button>
           <AccountMenu
             renderLogin={({ onClick }) => (

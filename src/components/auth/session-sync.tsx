@@ -1,5 +1,5 @@
 import { useQueryClient } from '@tanstack/react-query'
-import { useEffect } from 'react'
+import { useCallback, useEffect } from 'react'
 import { clearPrivateData, endSession, sessionKeys, useSession } from '@/lib/api/auth'
 import { useAuthDialog } from '@/lib/auth/auth-dialog'
 import { onSessionExpired, SESSION_TOKEN_KEY } from '@/lib/auth/session-token'
@@ -13,27 +13,21 @@ export function SessionSync() {
   const { data: session } = useSession()
   const expiresAt = session?.expiresAt
 
-  useEffect(
-    () =>
-      onSessionExpired(() => {
-        void endSession(queryClient)
-        open({ notice: SESSION_EXPIRED_NOTICE })
-      }),
-    [queryClient, open],
-  )
+  const expire = useCallback(() => {
+    void endSession(queryClient)
+    open({ notice: SESSION_EXPIRED_NOTICE })
+  }, [queryClient, open])
+
+  useEffect(() => onSessionExpired(expire), [expire])
 
   useEffect(() => {
     if (!expiresAt) return
     const timer = window.setTimeout(
-      () => {
-        void endSession(queryClient)
-        open({ notice: SESSION_EXPIRED_NOTICE })
-      },
-      // Clamped so a far-future date doesn't overflow setTimeout's 32-bit delay.
+      expire,
       Math.min(Math.max(Date.parse(expiresAt) - Date.now(), 0), 2 ** 31 - 1),
     )
     return () => window.clearTimeout(timer)
-  }, [expiresAt, queryClient, open])
+  }, [expiresAt, expire])
 
   useEffect(() => {
     const onStorage = (event: StorageEvent) => {

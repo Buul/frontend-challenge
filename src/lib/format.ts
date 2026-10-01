@@ -13,6 +13,8 @@ export const formatEthPtBr = (value: EthAmount) => `${formatDecimal(value, ',')}
 
 export const formatRating = (rating: number) => rating.toFixed(1)
 
+export const formatReviewCount = (count: number) => `${count} ${count === 1 ? 'avaliação' : 'avaliações'}`
+
 const dateFormatter = new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: 'short', year: 'numeric', timeZone: 'UTC' })
 
 export const formatDate = (iso: string) => dateFormatter.format(new Date(iso))

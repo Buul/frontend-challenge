@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { createFileRoute, Link, useCanGoBack, useRouter } from '@tanstack/react-router'
 import { useState } from 'react'
+import { PageShell } from '@/components/layout/page-shell'
 import { SiteFooter } from '@/components/layout/site-footer'
 import { SiteHeader } from '@/components/layout/site-header'
 import { StatusPage } from '@/components/layout/status-page'
@@ -10,7 +11,8 @@ import { NftInfoTabs } from '@/components/nft/nft-info-tabs'
 import { RelatedNfts } from '@/components/nft/related-nfts'
 import { useFavoriteToggle } from '@/components/nft/use-favorite-toggle'
 import { usePurchase } from '@/components/nft/use-purchase'
-import { Button, buttonVariants } from '@/components/ui/button'
+import { buttonVariants } from '@/components/ui/button'
+import { RetryAlert } from '@/components/ui/inline-alert'
 import { useIsMobile } from '@/hooks/use-media-query'
 import { ApiError, getErrorMessage } from '@/lib/api/errors'
 import { prefetchFavorites } from '@/lib/api/favorites'
@@ -33,17 +35,6 @@ export const Route = createFileRoute('/nfts/$nftId')({
 })
 
 const BUY_UNAVAILABLE = 'O carrinho ainda não está disponível nesta versão; nenhum item foi adicionado.'
-
-function DetailError({ error, onRetry }: { error: unknown; onRetry: () => void }) {
-  return (
-    <div role="alert" className="flex flex-col items-start gap-4 bg-card p-8">
-      <p className="text-muted-foreground">Não foi possível carregar este NFT. {getErrorMessage(error)}</p>
-      <Button onClick={onRetry} className="rounded-md font-bold">
-        Tentar novamente
-      </Button>
-    </div>
-  )
-}
 
 function NftDetailContent({ nft, isMobile, onBack }: { nft: NftDetail; isMobile: boolean; onBack: () => void }) {
   const { edition } = Route.useSearch()
@@ -98,7 +89,7 @@ function NftDetailPage() {
   const product = nft ? (
     <NftDetailContent key={nft.id} nft={nft} isMobile={isMobile} onBack={onBack} />
   ) : detail.isError ? (
-    <DetailError error={detail.error} onRetry={() => void detail.refetch()} />
+    <RetryAlert message={<>Não foi possível carregar este NFT. {getErrorMessage(detail.error)}</>} onRetry={() => void detail.refetch()} />
   ) : isMobile ? (
     <NftDetailMobileSkeleton onBack={onBack} />
   ) : (
@@ -132,7 +123,7 @@ function NftDetailPage() {
   }
 
   return (
-    <div className="mx-auto flex max-w-[1440px] flex-col gap-8 px-8 py-6 xl:px-[120px]">
+    <PageShell className="gap-8 px-8 py-6">
       <SiteHeader active="market" bordered={false} />
       <main id="conteudo" tabIndex={-1} className="flex flex-col gap-24 outline-none">
         <div className="flex flex-col gap-3">
@@ -143,6 +134,6 @@ function NftDetailPage() {
         {secondary}
       </main>
       <SiteFooter className="mt-16" />
-    </div>
+    </PageShell>
   )
 }

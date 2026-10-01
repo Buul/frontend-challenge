@@ -1,7 +1,7 @@
 import { Tabs } from '@base-ui/react/tabs'
 import { Skeleton } from '@/components/ui/skeleton'
 import type { NftDetail } from '@/lib/api/types'
-import { formatDate, formatRating, shortenAddress } from '@/lib/format'
+import { formatDate, formatRating, formatReviewCount, shortenAddress } from '@/lib/format'
 import { RatingStars } from './rating-stars'
 
 const tab =
@@ -54,8 +54,7 @@ function ReviewsPanel({ nft }: { nft: NftDetail }) {
       <p className="flex flex-wrap items-center gap-3">
         <RatingStars rating={nft.rating} />
         <span>
-          <span className="font-bold">{formatRating(nft.rating)}</span> de 5 · {nft.reviewCount}{' '}
-          {nft.reviewCount === 1 ? 'avaliação' : 'avaliações'}
+          <span className="font-bold">{formatRating(nft.rating)}</span> de 5 · {formatReviewCount(nft.reviewCount)}
         </span>
       </p>
       <ul className="flex flex-col gap-6">
@@ -94,7 +93,7 @@ export function NftInfoTabs({ nft }: { nft?: NftDetail }) {
 
   return (
     <Tabs.Root defaultValue="details" className="flex flex-col gap-3">
-      <Tabs.List aria-label="Informações do NFT" className="flex gap-8 overflow-x-auto border-b-[0.3px] border-primary [scrollbar-width:none]">
+      <Tabs.List aria-label="Informações do NFT" className="flex gap-8 overflow-x-auto hairline-b [scrollbar-width:none]">
         <Tabs.Tab value="details" className={tab}>
           Detalhes do NFT
         </Tabs.Tab>

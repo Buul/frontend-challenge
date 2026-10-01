@@ -2,7 +2,7 @@ import arrowRight from '@/assets/figma/arrow-right.svg'
 import emeraldApe from '@/assets/figma/nft-emerald-ape.jpg'
 import neonVessel from '@/assets/figma/nft-neon-vessel.jpg'
 import promoMask from '@/assets/figma/promo-mask.svg'
-import { buttonVariants } from '@/components/ui/button'
+import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 
 const PROMOS = [
@@ -43,16 +43,17 @@ export function Promos() {
               {title[1]}
             </h3>
             <p className="mt-2 max-w-[263px] text-sm leading-6 text-muted-foreground">{description}</p>
-            <a
-              href="#mercado"
-              className={cn(buttonVariants(), 'mt-auto mb-[46px] h-10 w-[140px] gap-4 rounded-md text-sm leading-5 font-medium')}
+            <Button
+              nativeButton={false}
+              render={<a href="#mercado" />}
+              className="mt-auto mb-[46px] h-10 w-[140px] gap-4 rounded-md text-sm leading-5 font-medium"
             >
               Explorar
               <span className="sr-only">
                 : {title[0]} {title[1]}
               </span>
               <img src={arrowRight} alt="" width={11} height={13} className="-rotate-90" />
-            </a>
+            </Button>
           </div>
         </article>
       ))}

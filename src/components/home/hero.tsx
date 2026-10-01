@@ -1,7 +1,9 @@
-import { useRef, useState, type KeyboardEvent } from 'react'
-import { Button, buttonVariants } from '@/components/ui/button'
+import { useRef, type KeyboardEvent } from 'react'
+import { Button } from '@/components/ui/button'
+import { RetryAlert } from '@/components/ui/inline-alert'
+import { Skeleton } from '@/components/ui/skeleton'
+import { useFeaturedCarousel } from '@/hooks/use-featured-carousel'
 import type { FeaturedNft } from '@/lib/api/types'
-import { formatEth } from '@/lib/format'
 import { cn } from '@/lib/utils'
 
 type HeroProps = {
@@ -69,14 +71,7 @@ export function SlideDots({
 }
 
 export function Hero({ slides, isError, onRetry }: HeroProps) {
-  const [active, setActive] = useState(0)
-  const [interacted, setInteracted] = useState(false)
-  const current = slides?.[active]
-
-  const select = (index: number) => {
-    setActive(index)
-    setInteracted(true)
-  }
+  const { active, select, liveText } = useFeaturedCarousel(slides)
 
   return (
     <section aria-labelledby="hero-title" className="flex flex-col-reverse items-center gap-10 lg:h-[450px] lg:flex-row lg:justify-between lg:pl-10">
@@ -96,9 +91,9 @@ export function Hero({ slides, isError, onRetry }: HeroProps) {
               artistas e tenha uma parte da cultura da internet.
             </p>
           </div>
-          <a href="#mercado" className={cn(buttonVariants(), 'h-10 w-[140px] rounded-md text-base leading-5 font-bold')}>
+          <Button nativeButton={false} render={<a href="#mercado" />} className="h-10 w-[140px] rounded-md text-base leading-5 font-bold">
             EXPLORAR
-          </a>
+          </Button>
         </div>
         <div className="h-6">
           {slides && slides.length > 1 && <SlideDots slides={slides} active={active} onSelect={select} />}
@@ -128,19 +123,14 @@ export function Hero({ slides, isError, onRetry }: HeroProps) {
           />
         ))}
 
-        {!slides && !isError && <div aria-hidden className="absolute inset-0 animate-pulse bg-card motion-reduce:animate-none" />}
+        {!slides && !isError && <Skeleton className="absolute inset-0 rounded-none" />}
 
         {!slides && isError && (
-          <div role="alert" className="absolute inset-0 flex flex-col items-center justify-center gap-4 p-8 text-center">
-            <p className="text-muted-foreground">Não foi possível carregar os destaques.</p>
-            <Button onClick={onRetry} className="rounded-md font-bold">
-              Tentar novamente
-            </Button>
-          </div>
+          <RetryAlert message="Não foi possível carregar os destaques." onRetry={onRetry} className="absolute inset-0 items-center justify-center text-center" />
         )}
 
         <p className="sr-only" aria-live="polite">
-          {interacted && slides && current ? `Destaque ${active + 1} de ${slides.length}: ${current.name}, ${formatEth(current.price)}` : ''}
+          {liveText}
         </p>
       </div>
     </section>

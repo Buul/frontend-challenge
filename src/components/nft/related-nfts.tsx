@@ -1,5 +1,5 @@
 import { Link } from '@tanstack/react-router'
-import { Button } from '@/components/ui/button'
+import { RetryAlert } from '@/components/ui/inline-alert'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useSnapCarousel } from '@/hooks/use-snap-carousel'
 import type { Nft } from '@/lib/api/types'
@@ -73,7 +73,7 @@ type RelatedNftsProps = {
 export function RelatedNfts({ nfts, isError, onRetry }: RelatedNftsProps) {
   return (
     <section aria-labelledby="related-title" className="flex flex-col gap-8">
-      <h2 id="related-title" className="border-b-[0.3px] border-primary pb-3 text-[17px] leading-4 font-bold text-brand">
+      <h2 id="related-title" className="hairline-b pb-3 text-[17px] leading-4 font-bold text-brand">
         Mais desta coleção
       </h2>
       {nfts ? (
@@ -83,12 +83,7 @@ export function RelatedNfts({ nfts, isError, onRetry }: RelatedNftsProps) {
           <p className="text-sm text-muted-foreground">Nenhum outro NFT desta coleção está à venda no momento.</p>
         )
       ) : isError ? (
-        <div role="alert" className="flex flex-col items-start gap-4 bg-card p-8">
-          <p className="text-muted-foreground">Não foi possível carregar os NFTs desta coleção.</p>
-          <Button onClick={onRetry} className="rounded-md font-bold">
-            Tentar novamente
-          </Button>
-        </div>
+        <RetryAlert message="Não foi possível carregar os NFTs desta coleção." onRetry={onRetry} />
       ) : (
         <ul aria-hidden className={cn(list, 'overflow-hidden pb-11')}>
           {Array.from({ length: 5 }, (_, index) => (

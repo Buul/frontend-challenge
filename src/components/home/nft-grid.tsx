@@ -1,10 +1,10 @@
 import { Link } from '@tanstack/react-router'
 import arrowDown from '@/assets/figma/arrow-down.svg'
 import arrowRight2 from '@/assets/figma/arrow-right-2.svg'
-import heartIcon from '@/assets/figma/card-heart.svg'
-import { FilledHeart } from '@/components/nft/favorite-heart'
+import { FavoriteButton } from '@/components/nft/favorite-button'
 import { useFavoriteToggle } from '@/components/nft/use-favorite-toggle'
-import { Button } from '@/components/ui/button'
+import { InlineAlert, RetryAlert } from '@/components/ui/inline-alert'
+import { Skeleton } from '@/components/ui/skeleton'
 import { NFT_SORTS, NFT_TABS, type Nft, type NftPage, type NftSort, type NftTab } from '@/lib/api/types'
 import { formatEth } from '@/lib/format'
 import { cn } from '@/lib/utils'
@@ -27,25 +27,7 @@ type NftGridProps = {
 
 function CardFavoriteButton({ nft, onFeedback }: { nft: Nft; onFeedback: (message: string) => void }) {
   const favorite = useFavoriteToggle(nft, onFeedback)
-
-  return (
-    <button
-      type="button"
-      aria-label={`Favoritar ${nft.name}`}
-      aria-pressed={favorite.active}
-      aria-busy={favorite.busy || undefined}
-      onClick={favorite.onToggle}
-      className={cn(
-        'absolute top-0 right-[7px] z-10 grid size-7 place-items-center rounded-full transition-transform active:scale-90 motion-reduce:transition-none',
-        // Widens the hit area to 44px without moving the 28px icon.
-        'before:absolute before:-inset-2 before:content-[""]',
-        favorite.busy && 'cursor-progress',
-      )}
-    >
-      <img src={heartIcon} alt="" width={28} height={28} className="absolute inset-0" />
-      {favorite.active && <FilledHeart width={15} height={13.35} className="relative bg-primary" />}
-    </button>
-  )
+  return <FavoriteButton variant="card" control={favorite} label={`Favoritar ${nft.name}`} />
 }
 
 function NftCard({ nft, onFavoriteFeedback }: { nft: Nft; onFavoriteFeedback?: (message: string) => void }) {
@@ -97,9 +79,9 @@ function NftCard({ nft, onFavoriteFeedback }: { nft: Nft; onFavoriteFeedback?: (
 function CardSkeleton() {
   return (
     <div className="flex flex-col gap-2 md:gap-3" aria-hidden>
-      <div className="aspect-[175/200] animate-pulse rounded-[20px] bg-card motion-reduce:animate-none md:aspect-auto md:h-[300px] md:rounded-none" />
-      <div className="h-4 w-2/3 animate-pulse rounded bg-card motion-reduce:animate-none" />
-      <div className="h-4 w-1/3 animate-pulse rounded bg-card motion-reduce:animate-none" />
+      <Skeleton className="aspect-[175/200] rounded-[20px] md:aspect-auto md:h-[300px] md:rounded-none" />
+      <Skeleton className="h-4 w-2/3" />
+      <Skeleton className="h-4 w-1/3" />
     </div>
   )
 }
@@ -208,21 +190,12 @@ export function NftGrid({
         </div>
 
         {isError ? (
-          <div role="alert" className="flex flex-col items-start gap-4 bg-card p-8">
-            <p className="text-muted-foreground">Não foi possível carregar os NFTs.</p>
-            <Button onClick={onRetry} className="rounded-md font-bold">
-              Tentar novamente
-            </Button>
-          </div>
+          <RetryAlert message="Não foi possível carregar os NFTs." onRetry={onRetry} />
         ) : result && result.data.length === 0 ? (
-          <div className="flex flex-col items-start gap-4 bg-card p-8">
-            <p className="text-muted-foreground">Nenhum NFT encontrado com esses critérios.</p>
-            {hasFilters && (
-              <Button onClick={onClearFilters} className="rounded-md font-bold">
-                Limpar filtros
-              </Button>
-            )}
-          </div>
+          <InlineAlert
+            message="Nenhum NFT encontrado com esses critérios."
+            action={hasFilters ? { label: 'Limpar filtros', onClick: onClearFilters } : undefined}
+          />
         ) : (
           <div
             aria-busy={isFetching}

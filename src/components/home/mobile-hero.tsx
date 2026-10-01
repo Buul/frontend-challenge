@@ -1,8 +1,9 @@
-import { useState } from 'react'
 import arrowRight from '@/assets/figma/arrow-right-primary.svg'
 import heroMask from '@/assets/figma/hero-mask-mobile.svg'
+import { RetryAlert } from '@/components/ui/inline-alert'
+import { Skeleton } from '@/components/ui/skeleton'
+import { useFeaturedCarousel } from '@/hooks/use-featured-carousel'
 import type { FeaturedNft } from '@/lib/api/types'
-import { formatEth } from '@/lib/format'
 import { SlideDots } from './hero'
 
 type MobileHeroProps = {
@@ -14,11 +15,9 @@ type MobileHeroProps = {
 function Artwork({ slides, active, isError, onRetry }: MobileHeroProps & { active: number }) {
   if (!slides) {
     return isError ? (
-      <button type="button" onClick={onRetry} className="text-xs font-bold text-brand underline-offset-4 hover:underline">
-        Tentar novamente
-      </button>
+      <RetryAlert message="Não foi possível carregar os destaques." onRetry={onRetry} className="items-center bg-transparent p-0 text-center" />
     ) : (
-      <div aria-hidden className="aspect-square w-full animate-pulse rounded-2xl bg-card motion-reduce:animate-none" />
+      <Skeleton className="aspect-square w-full rounded-2xl" />
     )
   }
 
@@ -51,9 +50,7 @@ function Artwork({ slides, active, isError, onRetry }: MobileHeroProps & { activ
 }
 
 export function MobileHero({ slides, isError, onRetry }: MobileHeroProps) {
-  const [active, setActive] = useState(0)
-  const [interacted, setInteracted] = useState(false)
-  const current = slides?.[active]
+  const { active, select, liveText } = useFeaturedCarousel(slides)
 
   return (
     <section
@@ -87,23 +84,13 @@ export function MobileHero({ slides, isError, onRetry }: MobileHeroProps) {
         >
           <Artwork slides={slides} active={active} isError={isError} onRetry={onRetry} />
           <p className="sr-only" aria-live="polite">
-            {interacted && slides && current ? `Destaque ${active + 1} de ${slides.length}: ${current.name}, ${formatEth(current.price)}` : ''}
+            {liveText}
           </p>
         </div>
       </div>
 
       <div className="relative h-[7px]">
-        {slides && slides.length > 1 && (
-          <SlideDots
-            compact
-            slides={slides}
-            active={active}
-            onSelect={(index) => {
-              setActive(index)
-              setInteracted(true)
-            }}
-          />
-        )}
+        {slides && slides.length > 1 && <SlideDots compact slides={slides} active={active} onSelect={select} />}
       </div>
     </section>
   )

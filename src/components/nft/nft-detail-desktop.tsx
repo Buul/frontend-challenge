@@ -1,13 +1,13 @@
 import { Link } from '@tanstack/react-router'
-import heartIcon from '@/assets/figma/heart-outline.svg'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import type { NftDetail } from '@/lib/api/types'
-import { formatEth } from '@/lib/format'
-import { cn } from '@/lib/utils'
+import { formatEth, formatReviewCount } from '@/lib/format'
 import { EditionPicker } from './edition-picker'
-import { FilledHeart, type FavoriteControl } from './favorite-heart'
+import { FavoriteButton } from './favorite-button'
+import { type FavoriteControl } from './favorite-heart'
 import { NftGallery } from './nft-gallery'
+import { PurchaseNotice } from './purchase-notice'
 import { QuantityStepper } from './quantity-stepper'
 import { RatingStars } from './rating-stars'
 import { ShareLinks } from './share-links'
@@ -66,7 +66,7 @@ export function NftDetailDesktop({ nft, purchase, favorite, feedback, shareUrl }
       <NftGallery name={nft.name} images={nft.images} />
 
       <div className="flex min-w-0 flex-1 flex-col gap-[13px] xl:justify-between">
-        <div className="flex flex-col gap-3 border-b-[0.3px] border-primary pb-3 xl:max-w-[573px]">
+        <div className="flex flex-col gap-3 hairline-b pb-3 xl:max-w-[573px]">
           <h1 className="text-[28px] leading-normal font-bold">{nft.name}</h1>
           <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-2">
             <p className="text-[22px] leading-4 font-bold text-brand">
@@ -75,7 +75,7 @@ export function NftDetailDesktop({ nft, purchase, favorite, feedback, shareUrl }
             </p>
             <p className="flex items-center gap-1 text-[15px] leading-5">
               <RatingStars rating={nft.rating} />
-              {nft.reviewCount} {nft.reviewCount === 1 ? 'avaliação' : 'avaliações'} de colecionadores
+              {formatReviewCount(nft.reviewCount)} de colecionadores
             </p>
           </div>
         </div>
@@ -94,31 +94,10 @@ export function NftDetailDesktop({ nft, purchase, favorite, feedback, shareUrl }
               <Button onClick={purchase.buy} disabled={purchase.soldOut} className="h-10 w-[130px] rounded-lg text-sm leading-5 font-bold">
                 COMPRAR
               </Button>
-              <button
-                type="button"
-                aria-pressed={favorite.active}
-                aria-busy={favorite.busy || undefined}
-                onClick={favorite.onToggle}
-                className={cn(
-                  'flex h-10 w-[130px] items-center justify-center gap-2 rounded-lg border border-primary text-sm leading-5 font-medium text-brand transition-colors hover:bg-primary/10',
-                  favorite.active && 'bg-primary/15',
-                  favorite.busy && 'cursor-progress',
-                )}
-              >
-                <span className="grid size-5 place-items-center">
-                  {favorite.active ? (
-                    <FilledHeart width={20} height={17.79} className="bg-primary" />
-                  ) : (
-                    <img src={heartIcon} alt="" width={20} height={20} />
-                  )}
-                </span>
-                Favoritar
-              </button>
+              <FavoriteButton variant="labeled" control={favorite} />
             </div>
           </div>
-          <p role="status" className="mt-2 text-xs leading-4 text-tertiary empty:mt-0">
-            {feedback ?? purchase.notice}
-          </p>
+          <PurchaseNotice message={feedback ?? purchase.notice} />
         </div>
 
         <div className="flex flex-col gap-3">

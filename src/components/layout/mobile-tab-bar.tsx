@@ -1,5 +1,6 @@
 import { Link } from '@tanstack/react-router'
 import { AccountMenu } from '@/components/auth/account-menu'
+import { cartLabel } from '@/components/ui/count-badge'
 import scan1 from '@/assets/figma/scan-1.svg'
 import scan2 from '@/assets/figma/scan-2.svg'
 import scan3 from '@/assets/figma/scan-3.svg'
@@ -59,7 +60,7 @@ export function MobileTabBar({ cartCount = 0 }: { cartCount?: number }) {
           </button>
           <button
             type="button"
-            aria-label={cartCount > 0 ? `Carrinho, ${cartCount} itens` : 'Carrinho vazio'}
+            aria-label={cartLabel(cartCount)}
             className={`${item} left-[calc(70.53%+10px)]`}
           >
             <img src={cartIcon} alt="" width={20} height={20} />

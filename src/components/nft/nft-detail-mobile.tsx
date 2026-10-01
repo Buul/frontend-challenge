@@ -1,17 +1,18 @@
 import type { ReactNode } from 'react'
 import arrowBack from '@/assets/figma/arrow-back.svg'
-import heartIcon from '@/assets/figma/heart-sm.svg'
 import shopIcon from '@/assets/figma/shop.svg'
 import starIcon from '@/assets/figma/star-amber.svg'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useSnapCarousel } from '@/hooks/use-snap-carousel'
 import type { NftDetail, NftImage } from '@/lib/api/types'
-import { formatEth, formatRating } from '@/lib/format'
+import { formatEth, formatRating, formatReviewCount } from '@/lib/format'
 import { cn } from '@/lib/utils'
 import { TokenFacts } from './nft-detail-desktop'
 import { EditionPicker } from './edition-picker'
-import { FilledHeart, type FavoriteControl } from './favorite-heart'
+import { FavoriteButton } from './favorite-button'
+import { type FavoriteControl } from './favorite-heart'
 import { QuantityStepper } from './quantity-stepper'
+import { PurchaseNotice } from './purchase-notice'
 import type { Purchase } from './use-purchase'
 
 /** Space reserved below the page so the fixed buy bar never covers content. */
@@ -70,22 +71,7 @@ function Hero({ onBack, favorite, children }: { onBack: () => void; favorite?: F
             <img src={arrowBack} alt="" width={13.17} height={7.33} className="rotate-90" />
           </span>
         </button>
-        {favorite && (
-          <button
-            type="button"
-            aria-label="Favoritar"
-            aria-pressed={favorite.active}
-            aria-busy={favorite.busy || undefined}
-            onClick={favorite.onToggle}
-            className={cn(circleButton, favorite.active && 'border-primary', favorite.busy && 'cursor-progress')}
-          >
-            {favorite.active ? (
-              <FilledHeart width={16} height={14.23} className="bg-brand" />
-            ) : (
-              <img src={heartIcon} alt="" width={16} height={14.23} />
-            )}
-          </button>
-        )}
+        {favorite && <FavoriteButton variant="circle" control={favorite} />}
       </div>
       {children}
     </div>
@@ -115,16 +101,14 @@ function BuyBar({ purchase, feedback }: { purchase: Purchase; feedback?: string 
               {formatEth(purchase.total)}
             </p>
           </div>
-          <p role="status" className="mt-2 text-xs leading-4 text-tertiary empty:mt-0">
-            {message}
-          </p>
+          <PurchaseNotice message={message} />
         </div>
         <div className="flex gap-3">
           <button
             type="button"
             onClick={purchase.buy}
             disabled={purchase.soldOut}
-            className="flex h-[60px] w-[196px] items-center justify-center rounded-[40px] bg-[linear-gradient(100.37deg,var(--primary)_3.96%,rgb(210_138_76/0.8)_121.97%)] text-base leading-5 font-bold text-primary-foreground transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+            className="flex h-[60px] w-[196px] items-center justify-center rounded-[40px] bg-[linear-gradient(100.37deg,var(--primary)_3.96%,color-mix(in_srgb,var(--primary)_80%,transparent)_121.97%)] text-base leading-5 font-bold text-primary-foreground transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
           >
             Comprar NFT
           </button>
@@ -165,7 +149,7 @@ export function NftDetailMobile({ nft, purchase, favorite, feedback, onBack }: N
           <h1 className="min-w-0 text-xl leading-6 font-bold">{nft.name}</h1>
           <p className="flex h-[27px] shrink-0 items-center gap-1 rounded-[32px] border border-primary px-[5.5px] text-sm leading-4">
             <span className="sr-only">
-              Avaliação {formatRating(nft.rating)} de 5, {nft.reviewCount} {nft.reviewCount === 1 ? 'avaliação' : 'avaliações'}
+              Avaliação {formatRating(nft.rating)} de 5, {formatReviewCount(nft.reviewCount)}
             </span>
             <span aria-hidden className="grid size-[14px] place-items-center">
               <img src={starIcon} alt="" width={11.67} height={11.08} />

@@ -10,6 +10,7 @@ import { MobileSearchBar } from '@/components/home/mobile-search-bar'
 import { NftGrid, SortSelect } from '@/components/home/nft-grid'
 import { Promos } from '@/components/home/promos'
 import { MOBILE_TAB_BAR_HEIGHT, MobileTabBar } from '@/components/layout/mobile-tab-bar'
+import { PageShell } from '@/components/layout/page-shell'
 import { SiteFooter } from '@/components/layout/site-footer'
 import { SiteHeader } from '@/components/layout/site-header'
 import { StatusToast, useStatusToast } from '@/components/ui/status-toast'
@@ -122,8 +123,8 @@ function Home() {
   const heroProps = { slides: featured.data, isError: featured.isError, onRetry: () => void featured.refetch() }
 
   return (
-    <div
-      className="mx-auto flex max-w-[1440px] flex-col gap-4 px-6 pt-10 md:gap-8 md:px-8 md:py-6 xl:px-[120px]"
+    <PageShell
+      className="gap-4 px-6 pt-10 md:gap-8 md:px-8 md:py-6"
       style={isMobile ? { paddingBottom: MOBILE_TAB_BAR_HEIGHT } : undefined}
     >
       {isMobile ? (
@@ -177,6 +178,6 @@ function Home() {
           <MobileTabBar />
         </>
       )}
-    </div>
+    </PageShell>
   )
 }

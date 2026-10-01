@@ -1,4 +1,5 @@
 import { useMutation } from '@tanstack/react-query'
+import { Button } from '@/components/ui/button'
 import { getErrorMessage } from '@/lib/api/errors'
 import { subscribeNewsletter } from '@/lib/api/nfts'
 import { cn } from '@/lib/utils'
@@ -67,13 +68,13 @@ function Newsletter() {
             placeholder="digite seu e-mail..."
             className="min-w-0 flex-1 bg-transparent pl-3 text-sm leading-4 outline-none placeholder:text-tertiary"
           />
-          <button
+          <Button
             type="submit"
             disabled={subscription.isPending}
-            className="w-[85px] rounded-r-md bg-primary pl-4 pr-1 text-lg leading-4 font-bold text-primary-foreground hover:bg-primary/80 disabled:opacity-60"
+            className="h-10 w-[85px] rounded-none rounded-r-md bg-primary pl-4 pr-1 text-lg leading-4 font-bold hover:bg-primary/80"
           >
             Enviar
-          </button>
+          </Button>
         </div>
       </form>
       <p id="newsletter-status" className="text-[13px] leading-[22px] text-muted-foreground" aria-live="polite">

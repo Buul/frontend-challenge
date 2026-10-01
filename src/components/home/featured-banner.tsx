@@ -1,6 +1,6 @@
 import sageNomad from '@/assets/figma/nft-sage-nomad.jpg'
 
-const bubble = 'absolute rounded-[29px] bg-[linear-gradient(145deg,rgb(210_138_76/0.3)_46%,rgb(210_138_76/0)_103%)]'
+const bubble = 'absolute rounded-[29px] bg-[linear-gradient(145deg,color-mix(in_srgb,var(--primary)_30%,transparent)_46%,transparent_103%)]'
 
 export function FeaturedBanner() {
   return (
