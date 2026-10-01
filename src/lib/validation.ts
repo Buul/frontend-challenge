@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { ENS_SUFFIXES, NETWORKS, WALLETS } from '@/lib/api/types'
 
 /** Shared by the forms and the mock API so both sides agree on what valid input is. */
 export const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
@@ -64,6 +65,54 @@ export const cartItemSchema = z.object({
 
 export const cartQuantitySchema = cartItemSchema.extend({
   quantity: z.number({ error: 'Informe a quantidade.' }).int().min(0).max(99),
+})
+
+const oneOf = (ids: readonly string[], message: string) =>
+  z
+    .string({ error: message })
+    .min(1, { error: message, abort: true })
+    .refine((value) => ids.includes(value), message)
+
+const WALLET_ADDRESS = /^(0x[a-fA-F0-9]{40}|[a-z0-9-]+(\.[a-z0-9-]+)*\.(eth|sol))$/
+
+/** Body of `POST /orders`. The desktop form collects the profile; mobile sends the signed-in collector and the chosen wallet. */
+export const checkoutSchema = z.object({
+  displayName: z
+    .string({ error: 'Informe o nome de exibição.' })
+    .trim()
+    .min(1, { error: 'Informe o nome de exibição.', abort: true })
+    .min(2, 'Use de 2 a 40 caracteres no nome de exibição.')
+    .max(40, 'Use de 2 a 40 caracteres no nome de exibição.'),
+  username,
+  network: oneOf(NETWORKS.map(({ id }) => id), 'Selecione uma rede.'),
+  profileName: z
+    .string({ error: 'Informe o nome do perfil.' })
+    .trim()
+    .min(1, { error: 'Informe o nome do perfil.', abort: true })
+    .min(2, 'Use de 2 a 40 caracteres no nome do perfil.')
+    .max(40, 'Use de 2 a 40 caracteres no nome do perfil.'),
+  walletAddress: z
+    .string({ error: 'Informe o endereço da carteira.' })
+    .trim()
+    .min(1, { error: 'Informe o endereço da carteira.', abort: true })
+    .regex(WALLET_ADDRESS, 'Informe um endereço 0x ou um nome ENS, como nome.eth.'),
+  secondaryWallet: z.string().trim().max(80, 'Use até 80 caracteres na carteira secundária.'),
+  walletType: oneOf(WALLETS.map(({ id }) => id), 'Selecione uma carteira.'),
+  referralCode: z
+    .string({ error: 'Informe o código de indicação.' })
+    .trim()
+    .min(1, { error: 'Informe o código de indicação.', abort: true })
+    .max(32, 'Use até 32 caracteres no código.')
+    .regex(/^[A-Za-z0-9]+$/, 'Use só letras e números no código.'),
+  email,
+  ensName: z
+    .string({ error: 'Informe o nome ENS.' })
+    .trim()
+    .min(1, { error: 'Informe o nome ENS.', abort: true })
+    .regex(/^[\p{L}\d-]{2,32}$/u, 'Use de 2 a 32 letras, números ou hífen.'),
+  ensSuffix: oneOf(ENS_SUFFIXES.map(({ id }) => id), 'Selecione o sufixo ENS.'),
+  useOtherWallet: z.boolean(),
+  notes: z.string().trim().max(280, 'Use até 280 caracteres na observação.'),
 })
 
 export const cartPromoSchema = z.object({

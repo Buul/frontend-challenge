@@ -3,7 +3,6 @@ import { createFileRoute, useCanGoBack, useRouter } from '@tanstack/react-router
 import { useState } from 'react'
 import { CartDesktop } from '@/components/cart/cart-desktop'
 import { CartMobile } from '@/components/cart/cart-mobile'
-import { CHECKOUT_UNAVAILABLE } from '@/components/cart/cart-summary'
 import { PageShell } from '@/components/layout/page-shell'
 import { SiteFooter } from '@/components/layout/site-footer'
 import { SiteHeader } from '@/components/layout/site-header'
@@ -16,7 +15,7 @@ import { cartQueryOptions, useApplyPromo, useUpdateCartItem } from '@/lib/api/ca
 import { getErrorMessage } from '@/lib/api/errors'
 import { suggestedNftsQueryOptions } from '@/lib/api/nfts'
 import type { CartItem } from '@/lib/api/types'
-import { useAuthDialog } from '@/lib/auth/auth-dialog'
+import { authIntent } from '@/lib/auth/auth-dialog'
 
 export const Route = createFileRoute('/cart')({
   loader: ({ context }) => {
@@ -35,7 +34,6 @@ function CartPage() {
   const updateItem = useUpdateCartItem()
   const applyPromo = useApplyPromo()
   const { user } = useSession()
-  const { open: openLogin } = useAuthDialog()
   const [notice, setNotice] = useState<string>()
 
   const pending = updateItem.isPending || applyPromo.isPending
@@ -58,13 +56,16 @@ function CartPage() {
 
   const onCheckout = () => {
     if (!user) {
-      openLogin({
-        notice: 'Entre para finalizar a compra.',
-        onAuthenticated: () => setNotice(CHECKOUT_UNAVAILABLE),
+      // `redirect` survives the dialog close. A callback that navigates races with history.back().
+      authIntent.set({ notice: 'Entre para finalizar a compra.' })
+      void router.navigate({
+        to: '.',
+        search: (prev) => ({ ...prev, auth: 'login', redirect: '/checkout' }),
+        resetScroll: false,
       })
       return
     }
-    setNotice(CHECKOUT_UNAVAILABLE)
+    void router.navigate({ to: '/checkout' })
   }
 
   const body = cart.data ? (

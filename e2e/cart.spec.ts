@@ -47,7 +47,8 @@ test('código inválido é informado e o checkout pede login ao visitante', asyn
   await page.getByRole('button', { name: 'Conectar e finalizar' }).click()
   await expect(page.getByRole('dialog')).toContainText('Entre para finalizar a compra.')
   await signIn(page, USERS.ana)
-  await expect(page.getByText(/pagamento ainda não está disponível/)).toBeVisible()
+  await expect(page).toHaveURL(/\/checkout$/)
+  await expect(page.getByRole('heading', { name: /Pagamento/ })).toBeVisible()
 })
 
 test('ícone do header abre o carrinho vazio', async ({ page }, testInfo) => {

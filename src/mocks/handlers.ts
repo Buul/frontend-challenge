@@ -7,6 +7,7 @@ import {
   NFT_TABS,
   type Cart,
   type CartItemInput,
+  type Order,
   type CollectionId,
   type FavoriteList,
   type FeaturedNftList,
@@ -22,7 +23,9 @@ import {
 } from '@/lib/api/types'
 import type { ApiErrorBody } from '@/lib/api/errors'
 import { compareEth, isEthAmount } from '@/lib/eth'
-import { cartItemSchema, cartPromoSchema, cartQuantitySchema, EMAIL_PATTERN, loginSchema, signupSchema, toFieldErrors } from '@/lib/validation'
+import { shortenAddress } from '@/lib/format'
+import type { CheckoutRequest } from '@/lib/api/orders'
+import { cartItemSchema, cartPromoSchema, cartQuantitySchema, checkoutSchema, EMAIL_PATTERN, loginSchema, signupSchema, toFieldErrors } from '@/lib/validation'
 import { authenticate, registerUser, sessionStore, toPublicUser, verifyCredentials } from './auth'
 import { cartStore } from './cart-store'
 import { featuredNfts, nftDetails, nfts, relatedNfts } from './data'
@@ -32,6 +35,11 @@ import { isScenarioActive } from './scenarios'
 
 const API = import.meta.env.VITE_API_URL ?? '/api'
 const PAGE_SIZE = 9
+
+function transactionId() {
+  const bytes = crypto.getRandomValues(new Uint8Array(32))
+  return `0x${Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('')}`
+}
 
 const countBy = <K extends string>(ids: readonly { id: K }[], key: (nft: (typeof nfts)[number]) => K) =>
   Object.fromEntries(ids.map(({ id }) => [id, nfts.filter((nft) => key(nft) === id).length])) as Record<K, number>
@@ -223,6 +231,33 @@ export const handlers: RequestHandler[] = [
     const result = cartStore.applyPromo(parsed.data.code)
     if ('error' in result) return conflict('Código promocional inválido.', { code: 'Código promocional inválido.' })
     return HttpResponse.json<Cart>(result.cart)
+  }),
+
+  http.post<never, CheckoutRequest, Order | ApiErrorBody>(`${API}/orders`, async ({ request }) => {
+    await delay(500)
+    const session = authenticate(request)
+    if (!session) return unauthenticated('Entre para finalizar a compra.')
+    if (isScenarioActive('checkout-error')) return serviceUnavailable()
+    const parsed = checkoutSchema.safeParse(await request.json().catch(() => ({})))
+    if (!parsed.success) return validationError(toFieldErrors(parsed.error), 'Verifique os dados informados.')
+
+    const taken = cartStore.take()
+    if ('error' in taken) return conflict('Seu carrinho está vazio.')
+
+    const network = NETWORKS.find((item) => item.id === parsed.data.network)
+    const { cart } = taken
+    return HttpResponse.json<Order>({
+      id: `KR-${crypto.randomUUID().slice(0, 8).toUpperCase()}`,
+      txId: transactionId(),
+      createdAt: new Date().toISOString(),
+      walletLabel: parsed.data.walletAddress.includes('.') ? parsed.data.walletAddress : shortenAddress(parsed.data.walletAddress),
+      networkLabel: network?.label ?? 'Ethereum',
+      items: cart.items.map(({ name, image, editionLabel, quantity, lineTotal }) => ({ name, image, editionLabel, quantity, lineTotal })),
+      subtotal: cart.subtotal,
+      discount: cart.discount,
+      networkFee: cart.networkFee,
+      total: cart.total,
+    })
   }),
 
   http.get<never, never, FavoriteList | ApiErrorBody>(`${API}/favorites`, async ({ request }) => {

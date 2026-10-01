@@ -115,4 +115,12 @@ export const cartStore = {
     store.write({ ...store.read(), promoCode: normalized })
     return { cart: snapshot() }
   },
+
+  /** Returns the current cart and empties it. An empty cart is left untouched. */
+  take() {
+    const cart = snapshot()
+    if (cart.itemCount === 0) return { error: 'empty' as const }
+    store.write({ items: [] })
+    return { cart }
+  },
 }

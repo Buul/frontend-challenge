@@ -14,6 +14,8 @@ export type MockScenario =
   | 'signup-error'
   /** Adding, updating or removing cart items answers 503. */
   | 'cart-error'
+  /** `POST /orders` answers 503. */
+  | 'checkout-error'
 
 export const isScenarioActive = (scenario: MockScenario) =>
   (localStorage.getItem(SCENARIOS_STORAGE_KEY) ?? '').split(',').map((value) => value.trim()).includes(scenario)

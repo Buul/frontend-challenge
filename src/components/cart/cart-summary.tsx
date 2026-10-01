@@ -4,8 +4,6 @@ import type { Cart } from '@/lib/api/types'
 import { formatDiscount, formatEth } from '@/lib/format'
 import { cn } from '@/lib/utils'
 
-export const CHECKOUT_UNAVAILABLE = 'O pagamento ainda não está disponível nesta versão; nenhum pedido foi enviado.'
-
 type CartSummaryProps = {
   cart: Cart
   layout: 'desktop' | 'mobile'

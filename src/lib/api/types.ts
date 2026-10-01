@@ -32,8 +32,21 @@ export const NFT_SORTS = [
 
 export const NFT_SEARCH_MAX_LENGTH = 100
 
+export const WALLETS = [
+  { id: 'walletconnect', label: 'WalletConnect' },
+  { id: 'metamask', label: 'MetaMask' },
+  { id: 'coinbase', label: 'Coinbase Wallet' },
+] as const
+
+export const ENS_SUFFIXES = [
+  { id: 'eth', label: '.eth' },
+  { id: 'sol', label: '.sol' },
+] as const
+
 export type CollectionId = (typeof COLLECTIONS)[number]['id']
 export type NetworkId = (typeof NETWORKS)[number]['id']
+export type WalletId = (typeof WALLETS)[number]['id']
+export type EnsSuffix = (typeof ENS_SUFFIXES)[number]['id']
 export type NftTab = (typeof NFT_TABS)[number]['id']
 export type NftSort = (typeof NFT_SORTS)[number]['id']
 
@@ -149,6 +162,28 @@ export type Cart = {
   networkFee: EthAmount
   total: EthAmount
   promoCode?: string
+}
+
+export type OrderLine = {
+  name: string
+  image: string
+  editionLabel: string
+  quantity: number
+  lineTotal: EthAmount
+}
+
+/** Receipt returned by `POST /orders` after the cart is cleared. */
+export type Order = {
+  id: string
+  txId: string
+  createdAt: string
+  walletLabel: string
+  networkLabel: string
+  items: OrderLine[]
+  subtotal: EthAmount
+  discount: EthAmount
+  networkFee: EthAmount
+  total: EthAmount
 }
 
 export type User = {
