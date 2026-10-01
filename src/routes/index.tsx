@@ -72,7 +72,7 @@ const CLEARED_FILTERS = {
 } satisfies Partial<NftQuery>
 
 function toQuery(search: Partial<NftQuery>): NftQuery {
-  return { tab: 'all', sort: 'recent', ...search, page: search.page ?? 1 }
+  return { ...search, tab: search.tab ?? 'all', sort: search.sort ?? 'recent', page: search.page ?? 1 }
 }
 
 function Home() {
