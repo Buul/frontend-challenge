@@ -7,6 +7,9 @@ const apiError = (status: number, code: ApiErrorCode, message: string, fieldErro
 export const unauthenticated = (message = 'Sua sessão expirou. Entre novamente.') =>
   apiError(401, 'UNAUTHENTICATED', message)
 
+export const conflict = (message: string, fieldErrors?: Record<string, string>) =>
+  apiError(409, 'CONFLICT', message, fieldErrors)
+
 export const notFound = (message: string) => apiError(404, 'NOT_FOUND', message)
 
 export const serviceUnavailable = (message = 'Serviço indisponível no momento. Tente novamente.') =>

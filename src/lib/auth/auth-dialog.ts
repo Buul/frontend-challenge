@@ -1,9 +1,12 @@
-import { useRouter } from '@tanstack/react-router'
+import { useRouter, useSearch } from '@tanstack/react-router'
 import { useCallback } from 'react'
 
-/** Search params owned by the root route; they open the login dialog over any screen. */
+export const AUTH_MODES = ['login', 'signup'] as const
+export type AuthMode = (typeof AUTH_MODES)[number]
+
+/** Search params owned by the root route; they open the login or signup dialog over any screen. */
 export type AuthSearch = {
-  auth?: 'login'
+  auth?: AuthMode
   /** Same-origin path to go to after signing in (e.g. a private screen that required login). */
   redirect?: string
 }
@@ -12,10 +15,10 @@ export type AuthSearch = {
 export const safeRedirect = (value: unknown) =>
   typeof value === 'string' && value.startsWith('/') && !value.startsWith('//') && !value.startsWith('/\\') ? value : undefined
 
-export const validateAuthSearch = (search: Record<string, unknown>): AuthSearch => ({
-  auth: search.auth === 'login' ? 'login' : undefined,
-  redirect: search.auth === 'login' ? safeRedirect(search.redirect) : undefined,
-})
+export const validateAuthSearch = (search: Record<string, unknown>): AuthSearch => {
+  const auth = AUTH_MODES.find((mode) => mode === search.auth)
+  return { auth, redirect: auth ? safeRedirect(search.redirect) : undefined }
+}
 
 type AuthIntent = {
   /** Shown above the form, e.g. why the user is being asked to sign in. */
@@ -61,7 +64,7 @@ export function useAuthDialog() {
   const open = useCallback(
     (next: AuthIntent = {}) => {
       authIntent.set({ ...authIntent.get(), ...next })
-      if (router.state.location.search.auth === 'login') return
+      if (router.state.location.search.auth) return
       opener = document.activeElement instanceof HTMLElement && document.activeElement !== document.body ? document.activeElement : null
       pushedEntry = true
       void router.navigate({ to: '.', search: (prev) => ({ ...prev, auth: 'login' }), resetScroll: false })
@@ -71,7 +74,7 @@ export function useAuthDialog() {
 
   const close = useCallback(() => {
     authIntent.set({})
-    if (router.state.location.search.auth !== 'login') return
+    if (!router.state.location.search.auth) return
     if (pushedEntry) {
       pushedEntry = false
       router.history.back()
@@ -96,5 +99,29 @@ export function useAuthDialog() {
     [router],
   )
 
-  return { open, close, closeTo }
+  /**
+   * Swaps login and signup in place: replacing the entry keeps `redirect` and the pending action, and closing still
+   * returns to the screen the dialog was opened from.
+   */
+  const switchTo = useCallback(
+    (mode: AuthMode) => {
+      void router.navigate({ to: '.', search: (prev) => ({ ...prev, auth: mode }), replace: true, resetScroll: false })
+    },
+    [router],
+  )
+
+  return { open, close, closeTo, switchTo }
+}
+
+/** Closes the dialog after signing in or up, going to `redirect` if any, then resumes the action that required it. */
+export function useCompleteAuth() {
+  const { redirect } = useSearch({ strict: false })
+  const { close, closeTo } = useAuthDialog()
+
+  return useCallback(() => {
+    const { onAuthenticated } = authIntent.get()
+    if (redirect) closeTo(redirect)
+    else close()
+    onAuthenticated?.()
+  }, [redirect, close, closeTo])
 }

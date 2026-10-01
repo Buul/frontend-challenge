@@ -16,14 +16,15 @@ import {
   type RelatedNftList,
   type Session,
   type SessionInfo,
+  type SignupRequest,
 } from '@/lib/api/types'
 import type { ApiErrorBody } from '@/lib/api/errors'
 import { compareEth, isEthAmount } from '@/lib/eth'
-import { EMAIL_PATTERN } from '@/lib/validation'
-import { authenticate, sessionStore, toPublicUser, verifyCredentials } from './auth'
+import { EMAIL_PATTERN, loginSchema, signupSchema, toFieldErrors } from '@/lib/validation'
+import { authenticate, registerUser, sessionStore, toPublicUser, verifyCredentials } from './auth'
 import { featuredNfts, nftDetails, nfts, relatedNfts } from './data'
 import { favoritesStore } from './favorites-store'
-import { notFound, serviceUnavailable, unauthenticated, validationError } from './http'
+import { conflict, notFound, serviceUnavailable, unauthenticated, validationError } from './http'
 import { isScenarioActive } from './scenarios'
 
 const API = import.meta.env.VITE_API_URL ?? '/api'
@@ -134,19 +135,28 @@ export const handlers: RequestHandler[] = [
   http.post<never, Partial<LoginRequest>, Session | ApiErrorBody>(`${API}/auth/login`, async ({ request }) => {
     await delay(600)
     if (isScenarioActive('login-error')) return serviceUnavailable()
-    const body = await request.json().catch(() => ({}) as Partial<LoginRequest>)
-    const email = typeof body.email === 'string' ? body.email.trim() : ''
-    const password = typeof body.password === 'string' ? body.password : ''
+    const parsed = loginSchema.safeParse(await request.json().catch(() => ({})))
+    if (!parsed.success) return validationError(toFieldErrors(parsed.error), 'Verifique os dados informados.')
 
-    const errors: Record<string, string> = {}
-    if (!EMAIL_PATTERN.test(email)) errors.email = 'Informe um e-mail válido.'
-    if (!password) errors.password = 'Informe sua senha.'
-    if (Object.keys(errors).length > 0) return validationError(errors, 'Verifique os dados informados.')
-
-    const user = await verifyCredentials(email, password)
+    const user = await verifyCredentials(parsed.data.email, parsed.data.password)
     // Same answer for unknown e-mail and wrong password, so accounts can't be enumerated.
     if (!user) return unauthenticated('E-mail ou senha incorretos.')
     return HttpResponse.json<Session>({ ...sessionStore.create(user.id), user: toPublicUser(user) })
+  }),
+
+  // Signs the new account in right away, answering with the same session shape as login.
+  http.post<never, Partial<SignupRequest>, Session | ApiErrorBody>(`${API}/auth/register`, async ({ request }) => {
+    await delay(700)
+    if (isScenarioActive('signup-error')) return serviceUnavailable()
+    const parsed = signupSchema.safeParse(await request.json().catch(() => ({})))
+    if (!parsed.success) return validationError(toFieldErrors(parsed.error), 'Verifique os dados informados.')
+
+    const user = await registerUser(parsed.data)
+    if (!user) {
+      const message = 'Já existe uma conta com este e-mail. Entre ou use outro e-mail.'
+      return conflict(message, { email: message })
+    }
+    return HttpResponse.json<Session>({ ...sessionStore.create(user.id), user: toPublicUser(user) }, { status: 201 })
   }),
 
   http.get<never, never, SessionInfo | ApiErrorBody>(`${API}/auth/session`, async ({ request }) => {

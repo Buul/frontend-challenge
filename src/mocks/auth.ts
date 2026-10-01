@@ -8,7 +8,7 @@ type UserRecord = User & {
 }
 
 /** Fixture accounts. Passwords (for demo and tests only): `Kurio@123` and `Kurio@456`. */
-export const users: UserRecord[] = [
+const fixtureUsers: UserRecord[] = [
   {
     id: 'user-ana',
     name: 'Ana Souza',
@@ -36,10 +36,41 @@ async function hashPassword(password: string, salt: string) {
   return toHex(bits)
 }
 
+const isUserRecord = (value: unknown): value is UserRecord =>
+  isRecord(value) && ['id', 'name', 'email', 'passwordHash', 'salt'].every((field) => typeof value[field] === 'string')
+
+/** Accounts created through `POST /auth/register`. */
+const registeredUsers = persisted<UserRecord[]>(
+  'kurio:mock:users',
+  () => [],
+  (value) => Array.isArray(value) && value.every(isUserRecord),
+)
+
+const allUsers = () => [...fixtureUsers, ...registeredUsers.read()]
+const normalizeEmail = (email: string) => email.trim().toLowerCase()
+const findByEmail = (email: string) => allUsers().find((candidate) => candidate.email === normalizeEmail(email))
+
 export const toPublicUser = ({ id, name, email }: UserRecord): User => ({ id, name, email })
 
+/** Returns `undefined` when the e-mail is already taken. */
+export async function registerUser(input: { name: string; email: string; password: string }) {
+  if (findByEmail(input.email)) return undefined
+  const salt = toHex(crypto.getRandomValues(new Uint8Array(16)).buffer)
+  const user: UserRecord = {
+    id: `user-${crypto.randomUUID()}`,
+    name: input.name.trim(),
+    email: normalizeEmail(input.email),
+    salt,
+    passwordHash: await hashPassword(input.password, salt),
+  }
+  // Re-checked after hashing: another tab may have registered the same e-mail meanwhile.
+  if (findByEmail(user.email)) return undefined
+  registeredUsers.write([...registeredUsers.read(), user])
+  return user
+}
+
 export async function verifyCredentials(email: string, password: string) {
-  const user = users.find((candidate) => candidate.email === email.trim().toLowerCase())
+  const user = findByEmail(email)
   // Hashes even for unknown e-mails so response time doesn't reveal which accounts exist.
   const hash = await hashPassword(password, user?.salt ?? '00'.repeat(16))
   return user && hash === user.passwordHash ? user : undefined
@@ -77,6 +108,6 @@ export function authenticate(request: Request) {
     sessionStore.revoke(token)
     return undefined
   }
-  const user = users.find((candidate) => candidate.id === session.userId)
+  const user = allUsers().find((candidate) => candidate.id === session.userId)
   return user && { token, user, expiresAt: session.expiresAt }
 }

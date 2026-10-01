@@ -10,6 +10,8 @@ export type MockScenario =
   | 'favorites-error'
   /** `POST /auth/login` answers 503. */
   | 'login-error'
+  /** `POST /auth/register` answers 503. */
+  | 'signup-error'
 
 export const isScenarioActive = (scenario: MockScenario) =>
   (localStorage.getItem(SCENARIOS_STORAGE_KEY) ?? '').split(',').map((value) => value.trim()).includes(scenario)

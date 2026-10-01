@@ -1,9 +1,21 @@
 import { expect, test, type Page } from '@playwright/test'
-import { accountButton, signIn, signInAt, USERS } from './auth-helpers.ts'
+import {
+  accountButton,
+  fillSignup,
+  signIn,
+  signInAt,
+  submitSignup,
+  switchToLogin,
+  switchToSignup,
+  USERS,
+  type TestUser,
+} from './auth-helpers.ts'
+
+const CARLA: TestUser = { name: 'Carla Dias', email: 'carla@kurio.dev', password: 'Colecao2026' }
 
 const openLogin = (page: Page) => page.getByRole('button', { name: 'Entrar', exact: true }).first().click()
 
-async function signOut(page: Page, user: (typeof USERS)[keyof typeof USERS]) {
+async function signOut(page: Page, user: TestUser) {
   await accountButton(page, user).click()
   await page.getByRole('menuitem', { name: 'Sair' }).click()
   await expect(page.getByRole('button', { name: 'Entrar', exact: true }).first()).toBeVisible()
@@ -128,4 +140,94 @@ test('falha do serviço de login é informada sem perder o e-mail digitado', asy
   await dialog.getByRole('button', { name: 'Entrar', exact: true }).click()
   await expect(dialog.getByRole('alert')).toHaveText(/indisponível/)
   await expect(dialog.getByLabel('E-mail')).toHaveValue(USERS.ana.email)
+})
+
+test('cadastro valida os campos, recusa e-mail já usado e a nova conta sobrevive ao refresh', async ({ page }) => {
+  await page.goto('/?tab=new')
+  await openLogin(page)
+  await switchToSignup(page)
+  await expect(page).toHaveURL(/auth=signup/)
+  const dialog = page.getByRole('dialog')
+  const name = dialog.getByLabel('Nome de usuário')
+  const email = dialog.getByLabel('E-mail')
+  const password = dialog.getByLabel('Senha', { exact: true })
+  const confirm = dialog.getByLabel('Confirmar senha', { exact: true })
+  await expect(name).toBeFocused()
+
+  await submitSignup(page)
+  await expect(name).toHaveAccessibleDescription('Informe seu nome de usuário.')
+  await expect(email).toHaveAccessibleDescription('Informe seu e-mail.')
+  await expect(password).toHaveAccessibleDescription('Crie uma senha.')
+  await expect(confirm).toHaveAccessibleDescription('Confirme sua senha.')
+  await expect(name).toBeFocused()
+
+  await fillSignup(page, { ...CARLA, password: 'curta' }, 'outra')
+  await expect(password).toHaveAccessibleDescription(/pelo menos 8 caracteres, com letras e números/)
+  await expect(confirm).toHaveAccessibleDescription('As senhas não coincidem.')
+  await expect(password).toBeFocused()
+
+  await fillSignup(page, { ...CARLA, email: USERS.ana.email })
+  await expect(email).toHaveAccessibleDescription(/Já existe uma conta com este e-mail/)
+  await expect(email).toBeFocused()
+
+  await email.fill(CARLA.email)
+  await submitSignup(page)
+  await expect(dialog).toBeHidden()
+  await expect(page).toHaveURL(/\/\?tab=new$/)
+  await expect(accountButton(page, CARLA)).toBeVisible()
+
+  const stored = await page.evaluate(() => localStorage.getItem('kurio:mock:users') ?? '')
+  expect(stored).toContain('passwordHash')
+  expect(stored).not.toContain(CARLA.password)
+
+  await page.reload()
+  await expect(accountButton(page, CARLA)).toBeVisible()
+  await signOut(page, CARLA)
+  await signInAt(page, '/', CARLA)
+  await expect(accountButton(page, CARLA)).toBeVisible()
+})
+
+test('alternar para o cadastro mantém o aviso e retoma o favorito com a conta nova', async ({ page }) => {
+  await page.goto('/nfts/nft-1')
+  const favorite = page.getByRole('button', { name: 'Favoritar' })
+  await favorite.click()
+  const dialog = page.getByRole('dialog')
+  await expect(dialog).toContainText('Entre para salvar seus favoritos.')
+
+  await switchToSignup(page)
+  await expect(page).toHaveURL(/auth=signup/)
+  await expect(dialog).toContainText('Entre para salvar seus favoritos.')
+  await switchToLogin(page)
+  await expect(page).toHaveURL(/auth=login/)
+  await switchToSignup(page)
+
+  await fillSignup(page, CARLA)
+  await expect(dialog).toBeHidden()
+  await expect(page).toHaveURL(/\/nfts\/nft-1$/)
+  await expect(favorite).toHaveAttribute('aria-pressed', 'true')
+})
+
+test('fechar o cadastro volta à tela de origem, e o link direto respeita o redirect', async ({ page }) => {
+  await page.goto('/')
+  await openLogin(page)
+  await switchToSignup(page)
+  await page.getByRole('button', { name: 'Fechar' }).click()
+  await expect(page.getByRole('dialog')).toBeHidden()
+  await expect(page).not.toHaveURL(/auth=/)
+  await expect(page.getByRole('button', { name: 'Entrar', exact: true }).first()).toBeFocused()
+
+  await page.goto('/?auth=signup&redirect=%2Fnfts%2Fnft-3')
+  await fillSignup(page, CARLA)
+  await expect(page).toHaveURL(/\/nfts\/nft-3$/)
+  expect(await page.evaluate(() => localStorage.getItem('kurio:session-token'))).not.toBeNull()
+})
+
+test('falha do serviço de cadastro é informada sem perder os dados digitados', async ({ page }) => {
+  await page.addInitScript(() => localStorage.setItem('kurio:mock-scenarios', 'signup-error'))
+  await page.goto('/?auth=signup')
+  await fillSignup(page, CARLA)
+  const dialog = page.getByRole('dialog')
+  await expect(dialog.getByRole('alert')).toHaveText(/indisponível/)
+  await expect(dialog.getByLabel('Nome de usuário')).toHaveValue(CARLA.name)
+  await expect(dialog.getByLabel('E-mail')).toHaveValue(CARLA.email)
 })

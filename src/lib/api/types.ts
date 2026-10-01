@@ -135,6 +135,10 @@ export type LoginRequest = {
   password: string
 }
 
+export type SignupRequest = LoginRequest & {
+  name: string
+}
+
 /** `token` is a bearer token sent as `Authorization: Bearer <token>`; `expiresAt` is ISO 8601. */
 export type Session = {
   token: string

@@ -1,7 +1,7 @@
 import type { QueryClient } from '@tanstack/react-query'
 import { createRootRouteWithContext, Link, Outlet, useRouter, type ErrorComponentProps } from '@tanstack/react-router'
 import { lazy, Suspense } from 'react'
-import { LoginDialog } from '@/components/auth/login-dialog'
+import { AuthDialog } from '@/components/auth/auth-dialog'
 import { SessionSync } from '@/components/auth/session-sync'
 import { StatusPage } from '@/components/layout/status-page'
 import { Button } from '@/components/ui/button'
@@ -25,7 +25,7 @@ function RootLayout() {
     <>
       <Outlet />
       <SessionSync />
-      <LoginDialog />
+      <AuthDialog />
       <Suspense>
         <Devtools />
       </Suspense>

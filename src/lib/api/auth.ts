@@ -2,7 +2,7 @@ import { queryOptions, useMutation, useQuery, useQueryClient, type QueryClient }
 import { sessionToken } from '@/lib/auth/session-token'
 import { api } from './client'
 import { ApiError } from './errors'
-import type { LoginRequest, Session, SessionInfo } from './types'
+import type { LoginRequest, Session, SessionInfo, SignupRequest } from './types'
 
 export const sessionKeys = { current: ['session'] as const }
 
@@ -53,6 +53,12 @@ export async function endSession(queryClient: QueryClient) {
   queryClient.setQueryData(sessionKeys.current, null)
 }
 
+async function startSession(queryClient: QueryClient, { token, ...session }: Session) {
+  await clearPrivateData(queryClient)
+  sessionToken.set(token)
+  queryClient.setQueryData(sessionKeys.current, session)
+}
+
 export function useLogin() {
   const queryClient = useQueryClient()
 
@@ -62,11 +68,20 @@ export function useLogin() {
       sessionToken.clear()
       return (await api.post<Session>('/auth/login', credentials)).data
     },
-    onSuccess: async ({ token, ...session }) => {
-      await clearPrivateData(queryClient)
-      sessionToken.set(token)
-      queryClient.setQueryData(sessionKeys.current, session)
+    onSuccess: (session) => startSession(queryClient, session),
+  })
+}
+
+/** Creates the account and signs it in, replacing any previous session. */
+export function useSignup() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: async (input: SignupRequest) => {
+      sessionToken.clear()
+      return (await api.post<Session>('/auth/register', input)).data
     },
+    onSuccess: (session) => startSession(queryClient, session),
   })
 }
 
