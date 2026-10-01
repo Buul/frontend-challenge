@@ -59,6 +59,7 @@ export type Nft = {
   listedAt: string
   isNew: boolean
   isTrending: boolean
+  isRare: boolean
   editions: NftEdition[]
 }
 

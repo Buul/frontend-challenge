@@ -9,7 +9,7 @@ type Seed = Pick<Nft, 'name' | 'image' | 'price'> & Partial<Nft>
 const FEATURED: Seed[] = [
   { name: 'Emerald Ape #042', image: emeraldApe, price: '1.19', isTrending: true },
   { name: 'Sage Nomad #009', image: sageNomad, price: '1.69' },
-  { name: 'Neon Vessel #552', image: neonVessel, price: '1.99', previousPrice: '2.29', isTrending: true },
+  { name: 'Neon Vessel #552', image: neonVessel, price: '1.99', previousPrice: '2.29', isTrending: true, isRare: true },
   { name: 'Cosmic Bloom #118', image: sageNomad, price: '1.29' },
   { name: 'Violet Nomad #314', image: sageNomad, price: '1.39' },
   { name: 'Ivory Baron #088', image: neonVessel, price: '1.79' },
@@ -28,6 +28,7 @@ const GENERATED: Seed[] = Array.from({ length: 27 }, (_, i) => ({
   image: IMAGES[i % IMAGES.length],
   price: PRICES[i % PRICES.length],
   isTrending: i % 5 === 0,
+  isRare: i % 7 === 3,
 }))
 
 const NOW = Date.parse('2026-09-30T12:00:00Z')
@@ -47,6 +48,7 @@ export const nfts: Nft[] = [...FEATURED, ...GENERATED].map((seed, index) => ({
   listedAt: new Date(NOW - index * 7 * HOUR).toISOString(),
   isNew: index < 12,
   isTrending: false,
+  isRare: false,
   editions: editionsFor(index),
   ...seed,
 }))
