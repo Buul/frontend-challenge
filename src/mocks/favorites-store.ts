@@ -1,26 +1,24 @@
-/** Visitor favorites kept in `localStorage` so they survive reloads; there is no user account yet. */
-const STORAGE_KEY = 'kurio:mock:favorites'
+import { isRecord, persisted } from './storage'
 
-function read(): string[] {
-  try {
-    const value: unknown = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? '[]')
-    return Array.isArray(value) ? value.filter((id): id is string => typeof id === 'string') : []
-  } catch {
-    return []
-  }
+/** Favorites per user id, kept in `localStorage` so they survive reloads. */
+const store = persisted<Record<string, string[]>>('kurio:mock:favorites', () => ({}), isRecord)
+
+const listFor = (userId: string) => {
+  const ids = store.read()[userId]
+  return Array.isArray(ids) ? ids.filter((id): id is string => typeof id === 'string') : []
 }
 
-const write = (ids: string[]) => localStorage.setItem(STORAGE_KEY, JSON.stringify(ids))
+const writeFor = (userId: string, ids: string[]) => store.write({ ...store.read(), [userId]: ids })
 
 export const favoritesStore = {
-  list: read,
-  add(id: string) {
-    const ids = read()
-    if (!ids.includes(id)) write([...ids, id])
-    return read()
+  list: listFor,
+  add(userId: string, nftId: string) {
+    const ids = listFor(userId)
+    if (!ids.includes(nftId)) writeFor(userId, [...ids, nftId])
+    return listFor(userId)
   },
-  remove(id: string) {
-    write(read().filter((current) => current !== id))
-    return read()
+  remove(userId: string, nftId: string) {
+    writeFor(userId, listFor(userId).filter((id) => id !== nftId))
+    return listFor(userId)
   },
 }

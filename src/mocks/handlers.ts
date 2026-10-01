@@ -8,17 +8,22 @@ import {
   type CollectionId,
   type FavoriteList,
   type FeaturedNftList,
+  type LoginRequest,
   type NetworkId,
   type NftDetail,
   type NftFacets,
   type NftPage,
   type RelatedNftList,
+  type Session,
+  type SessionInfo,
 } from '@/lib/api/types'
 import type { ApiErrorBody } from '@/lib/api/errors'
 import { compareEth, isEthAmount } from '@/lib/eth'
+import { EMAIL_PATTERN } from '@/lib/validation'
+import { authenticate, sessionStore, toPublicUser, verifyCredentials } from './auth'
 import { featuredNfts, nftDetails, nfts, relatedNfts } from './data'
 import { favoritesStore } from './favorites-store'
-import { notFound, serviceUnavailable, validationError } from './http'
+import { notFound, serviceUnavailable, unauthenticated, validationError } from './http'
 import { isScenarioActive } from './scenarios'
 
 const API = import.meta.env.VITE_API_URL ?? '/api'
@@ -126,18 +131,56 @@ export const handlers: RequestHandler[] = [
     return HttpResponse.json<RelatedNftList>({ data: relatedNfts(params.id) })
   }),
 
-  http.get(`${API}/favorites`, async () => {
+  http.post<never, Partial<LoginRequest>, Session | ApiErrorBody>(`${API}/auth/login`, async ({ request }) => {
+    await delay(600)
+    if (isScenarioActive('login-error')) return serviceUnavailable()
+    const body = await request.json().catch(() => ({}) as Partial<LoginRequest>)
+    const email = typeof body.email === 'string' ? body.email.trim() : ''
+    const password = typeof body.password === 'string' ? body.password : ''
+
+    const errors: Record<string, string> = {}
+    if (!EMAIL_PATTERN.test(email)) errors.email = 'Informe um e-mail válido.'
+    if (!password) errors.password = 'Informe sua senha.'
+    if (Object.keys(errors).length > 0) return validationError(errors, 'Verifique os dados informados.')
+
+    const user = await verifyCredentials(email, password)
+    // Same answer for unknown e-mail and wrong password, so accounts can't be enumerated.
+    if (!user) return unauthenticated('E-mail ou senha incorretos.')
+    return HttpResponse.json<Session>({ ...sessionStore.create(user.id), user: toPublicUser(user) })
+  }),
+
+  http.get<never, never, SessionInfo | ApiErrorBody>(`${API}/auth/session`, async ({ request }) => {
+    await delay(150)
+    const session = authenticate(request)
+    if (!session) return unauthenticated()
+    return HttpResponse.json<SessionInfo>({ user: toPublicUser(session.user), expiresAt: session.expiresAt })
+  }),
+
+  // Idempotent: logging out with an unknown or expired token still succeeds.
+  http.post(`${API}/auth/logout`, async ({ request }) => {
     await delay(200)
-    return HttpResponse.json<FavoriteList>({ data: favoritesStore.list() })
+    const session = authenticate(request)
+    if (session) sessionStore.revoke(session.token)
+    return new HttpResponse(null, { status: 204 })
+  }),
+
+  http.get<never, never, FavoriteList | ApiErrorBody>(`${API}/favorites`, async ({ request }) => {
+    await delay(200)
+    const session = authenticate(request)
+    if (!session) return unauthenticated()
+    return HttpResponse.json<FavoriteList>({ data: favoritesStore.list(session.user.id) })
   }),
 
   // PUT and DELETE are idempotent: repeating either leaves the same list.
   ...(['put', 'delete'] as const).map((method) =>
-    http[method]<{ nftId: string }, never, FavoriteList | ApiErrorBody>(`${API}/favorites/:nftId`, async ({ params }) => {
+    http[method]<{ nftId: string }, never, FavoriteList | ApiErrorBody>(`${API}/favorites/:nftId`, async ({ params, request }) => {
       await delay(500)
+      const session = authenticate(request)
+      if (!session) return unauthenticated()
       if (isScenarioActive('favorites-error')) return serviceUnavailable()
       if (!nftDetails.has(params.nftId)) return notFound('NFT não encontrado.')
-      const ids = method === 'put' ? favoritesStore.add(params.nftId) : favoritesStore.remove(params.nftId)
+      const { id } = session.user
+      const ids = method === 'put' ? favoritesStore.add(id, params.nftId) : favoritesStore.remove(id, params.nftId)
       return HttpResponse.json<FavoriteList>({ data: ids })
     }),
   ),
@@ -145,7 +188,7 @@ export const handlers: RequestHandler[] = [
   http.post(`${API}/newsletter`, async ({ request }) => {
     await delay(400)
     const { email } = (await request.json()) as { email?: unknown }
-    if (typeof email !== 'string' || !/^\S+@\S+\.\S+$/.test(email)) {
+    if (typeof email !== 'string' || !EMAIL_PATTERN.test(email)) {
       return validationError({ email: 'Informe um e-mail válido.' }, 'Informe um e-mail válido.')
     }
     return new HttpResponse(null, { status: 204 })

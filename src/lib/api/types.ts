@@ -119,10 +119,31 @@ export type RelatedNftList = {
   data: Nft[]
 }
 
-/** Ids of the NFTs favorited by the current visitor. */
+/** Ids of the NFTs favorited by the authenticated user. */
 export type FavoriteList = {
   data: string[]
 }
+
+export type User = {
+  id: string
+  name: string
+  email: string
+}
+
+export type LoginRequest = {
+  email: string
+  password: string
+}
+
+/** `token` is a bearer token sent as `Authorization: Bearer <token>`; `expiresAt` is ISO 8601. */
+export type Session = {
+  token: string
+  expiresAt: string
+  user: User
+}
+
+/** `GET /auth/session` does not echo the token back. */
+export type SessionInfo = Omit<Session, 'token'>
 
 export type FeaturedNft = Pick<Nft, 'id' | 'name' | 'image' | 'price'> & {
   imageAlt: string

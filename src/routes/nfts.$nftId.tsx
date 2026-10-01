@@ -13,7 +13,7 @@ import { usePurchase } from '@/components/nft/use-purchase'
 import { Button, buttonVariants } from '@/components/ui/button'
 import { useIsMobile } from '@/hooks/use-media-query'
 import { ApiError, getErrorMessage } from '@/lib/api/errors'
-import { favoritesQueryOptions } from '@/lib/api/favorites'
+import { prefetchFavorites } from '@/lib/api/favorites'
 import { nftDetailQueryOptions, relatedNftsQueryOptions } from '@/lib/api/nfts'
 import type { NftDetail } from '@/lib/api/types'
 import { cn } from '@/lib/utils'
@@ -27,7 +27,7 @@ export const Route = createFileRoute('/nfts/$nftId')({
   loader: ({ context, params }) => {
     void context.queryClient.prefetchQuery(nftDetailQueryOptions(params.nftId))
     void context.queryClient.prefetchQuery(relatedNftsQueryOptions(params.nftId))
-    void context.queryClient.prefetchQuery(favoritesQueryOptions())
+    prefetchFavorites(context.queryClient)
   },
   component: NftDetailPage,
 })

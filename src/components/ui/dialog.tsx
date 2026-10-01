@@ -38,4 +38,8 @@ function DialogTitle({ className, ...props }: DialogPrimitive.Title.Props) {
   return <DialogPrimitive.Title data-slot="dialog-title" className={cn("text-lg font-bold", className)} {...props} />
 }
 
-export { Dialog, DialogClose, DialogContent, DialogTitle, DialogTrigger }
+function DialogDescription(props: DialogPrimitive.Description.Props) {
+  return <DialogPrimitive.Description data-slot="dialog-description" {...props} />
+}
+
+export { Dialog, DialogClose, DialogContent, DialogDescription, DialogTitle, DialogTrigger }

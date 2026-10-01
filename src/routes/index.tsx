@@ -14,7 +14,7 @@ import { SiteFooter } from '@/components/layout/site-footer'
 import { SiteHeader } from '@/components/layout/site-header'
 import { StatusToast, useStatusToast } from '@/components/ui/status-toast'
 import { useIsMobile } from '@/hooks/use-media-query'
-import { favoritesQueryOptions } from '@/lib/api/favorites'
+import { prefetchFavorites } from '@/lib/api/favorites'
 import { featuredNftsQueryOptions, nftFacetsQueryOptions, nftListQueryOptions } from '@/lib/api/nfts'
 import { COLLECTIONS, NETWORKS, NFT_SEARCH_MAX_LENGTH, NFT_SORTS, NFT_TABS, type NftQuery, type NftSort } from '@/lib/api/types'
 import { compareEth, isEthAmount, normalizeEth } from '@/lib/eth'
@@ -65,7 +65,7 @@ export const Route = createFileRoute('/')({
     void context.queryClient.prefetchQuery(featuredNftsQueryOptions())
     void context.queryClient.prefetchQuery(nftFacetsQueryOptions())
     void context.queryClient.prefetchQuery(nftListQueryOptions(toQuery(deps)))
-    void context.queryClient.prefetchQuery(favoritesQueryOptions())
+    prefetchFavorites(context.queryClient)
   },
   component: Home,
 })

@@ -1,4 +1,5 @@
 import { Link } from '@tanstack/react-router'
+import { AccountMenu } from '@/components/auth/account-menu'
 import scan1 from '@/assets/figma/scan-1.svg'
 import scan2 from '@/assets/figma/scan-2.svg'
 import scan3 from '@/assets/figma/scan-3.svg'
@@ -63,9 +64,20 @@ export function MobileTabBar({ cartCount = 0 }: { cartCount?: number }) {
           >
             <img src={cartIcon} alt="" width={20} height={20} />
           </button>
-          <button type="button" aria-label="Entrar" className={`${item} left-[calc(85.51%+10px)]`}>
-            <img src={userIcon} alt="" width={20} height={20} />
-          </button>
+          <AccountMenu
+            side="top"
+            renderLogin={({ onClick }) => (
+              <button type="button" aria-label="Entrar" onClick={onClick} className={`${item} left-[calc(85.51%+10px)]`}>
+                <img src={userIcon} alt="" width={20} height={20} />
+              </button>
+            )}
+            trigger={(name) => (
+              <button type="button" aria-label={`Conta de ${name}`} className={`${item} left-[calc(85.51%+10px)]`}>
+                <img src={userIcon} alt="" width={20} height={20} />
+                <span aria-hidden className="absolute top-2 right-2 size-2 rounded-full bg-primary ring-2 ring-card" />
+              </button>
+            )}
+          />
         </div>
       </div>
     </nav>

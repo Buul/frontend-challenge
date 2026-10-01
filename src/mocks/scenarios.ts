@@ -7,7 +7,9 @@ export const SCENARIOS_STORAGE_KEY = 'kurio:mock-scenarios'
 
 export type MockScenario =
   /** Adding or removing a favorite answers 503. */
-  'favorites-error'
+  | 'favorites-error'
+  /** `POST /auth/login` answers 503. */
+  | 'login-error'
 
 export const isScenarioActive = (scenario: MockScenario) =>
   (localStorage.getItem(SCENARIOS_STORAGE_KEY) ?? '').split(',').map((value) => value.trim()).includes(scenario)

@@ -3,6 +3,7 @@ import { useRef, useState } from 'react'
 import cartIcon from '@/assets/figma/cart.svg'
 import loginIcon from '@/assets/figma/login.svg'
 import searchIcon from '@/assets/figma/search.svg'
+import { AccountMenu } from '@/components/auth/account-menu'
 import { Button } from '@/components/ui/button'
 import { useSearchSubmit } from '@/hooks/use-search-submit'
 import { NFT_SEARCH_MAX_LENGTH } from '@/lib/api/types'
@@ -136,10 +137,23 @@ export function SiteHeader({ cartCount = 0, active = 'home', bordered = true }: 
               </span>
             )}
           </button>
-          <Button className="h-[35px] w-[100px] gap-1 rounded-md text-base font-medium">
-            <img src={loginIcon} alt="" width={18} height={17} />
-            Entrar
-          </Button>
+          <AccountMenu
+            renderLogin={({ onClick }) => (
+              <Button onClick={onClick} className="h-[35px] w-[100px] gap-1 rounded-md text-base font-medium">
+                <img src={loginIcon} alt="" width={18} height={17} />
+                Entrar
+              </Button>
+            )}
+            trigger={(name) => (
+              <button
+                type="button"
+                aria-label={`Conta de ${name}`}
+                className="h-[35px] max-w-40 truncate rounded-md border border-primary px-3 text-base font-medium text-brand hover:bg-primary/10"
+              >
+                {name.split(' ')[0]}
+              </button>
+            )}
+          />
         </div>
       </div>
     </header>
