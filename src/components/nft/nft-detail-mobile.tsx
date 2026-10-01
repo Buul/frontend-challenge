@@ -107,7 +107,7 @@ function BuyBar({ purchase, feedback }: { purchase: Purchase; feedback?: string 
           <button
             type="button"
             onClick={purchase.buy}
-            disabled={purchase.soldOut}
+            disabled={purchase.soldOut || purchase.busy}
             className="flex h-[60px] w-[196px] items-center justify-center rounded-[40px] bg-[linear-gradient(100.37deg,var(--primary)_3.96%,color-mix(in_srgb,var(--primary)_80%,transparent)_121.97%)] text-base leading-5 font-bold text-primary-foreground transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
           >
             Comprar NFT
@@ -115,8 +115,8 @@ function BuyBar({ purchase, feedback }: { purchase: Purchase; feedback?: string 
           <button
             type="button"
             aria-label="Adicionar ao carrinho"
-            onClick={purchase.buy}
-            disabled={purchase.soldOut}
+            onClick={purchase.add}
+            disabled={purchase.soldOut || purchase.busy}
             className="grid size-[60px] place-items-center rounded-full border border-border bg-surface-raised disabled:cursor-not-allowed disabled:opacity-50"
           >
             <span className="grid size-5 place-items-center">

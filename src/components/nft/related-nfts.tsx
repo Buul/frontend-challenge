@@ -68,13 +68,14 @@ type RelatedNftsProps = {
   nfts?: Nft[]
   isError: boolean
   onRetry: () => void
+  title?: string
 }
 
-export function RelatedNfts({ nfts, isError, onRetry }: RelatedNftsProps) {
+export function RelatedNfts({ nfts, isError, onRetry, title = 'Mais desta coleção' }: RelatedNftsProps) {
   return (
     <section aria-labelledby="related-title" className="flex flex-col gap-8">
       <h2 id="related-title" className="hairline-b pb-3 text-[17px] leading-4 font-bold text-brand">
-        Mais desta coleção
+        {title}
       </h2>
       {nfts ? (
         nfts.length > 0 ? (

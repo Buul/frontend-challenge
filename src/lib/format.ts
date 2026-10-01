@@ -24,3 +24,5 @@ export const shortenAddress = (address: string) => `${address.slice(0, 6)}...${a
 
 export const formatEthRange = (min: EthAmount, max: EthAmount) =>
   `${formatDecimal(min, ',')} - ${formatDecimal(max, ',')} ETH`
+
+export const formatDiscount = (value: EthAmount) => `(-) ${formatDecimal(value, '.')}`

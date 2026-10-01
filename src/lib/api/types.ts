@@ -124,6 +124,33 @@ export type FavoriteList = {
   data: string[]
 }
 
+export type CartItemInput = {
+  nftId: string
+  editionId: string
+  quantity: number
+}
+
+export type CartItem = CartItemInput & {
+  name: string
+  image: string
+  tokenId: string
+  editionLabel: string
+  unitPrice: EthAmount
+  lineTotal: EthAmount
+  available: number
+  maxPerOrder: number
+}
+
+export type Cart = {
+  items: CartItem[]
+  itemCount: number
+  subtotal: EthAmount
+  discount: EthAmount
+  networkFee: EthAmount
+  total: EthAmount
+  promoCode?: string
+}
+
 export type User = {
   id: string
   name: string

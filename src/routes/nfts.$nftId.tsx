@@ -15,6 +15,7 @@ import { buttonVariants } from '@/components/ui/button'
 import { RetryAlert } from '@/components/ui/inline-alert'
 import { useIsMobile } from '@/hooks/use-media-query'
 import { ApiError, getErrorMessage } from '@/lib/api/errors'
+import { cartQueryOptions } from '@/lib/api/cart'
 import { prefetchFavorites } from '@/lib/api/favorites'
 import { nftDetailQueryOptions, relatedNftsQueryOptions } from '@/lib/api/nfts'
 import type { NftDetail } from '@/lib/api/types'
@@ -30,15 +31,15 @@ export const Route = createFileRoute('/nfts/$nftId')({
     void context.queryClient.prefetchQuery(nftDetailQueryOptions(params.nftId))
     void context.queryClient.prefetchQuery(relatedNftsQueryOptions(params.nftId))
     prefetchFavorites(context.queryClient)
+    void context.queryClient.prefetchQuery(cartQueryOptions())
   },
   component: NftDetailPage,
 })
 
-const BUY_UNAVAILABLE = 'O carrinho ainda não está disponível nesta versão; nenhum item foi adicionado.'
-
 function NftDetailContent({ nft, isMobile, onBack }: { nft: NftDetail; isMobile: boolean; onBack: () => void }) {
   const { edition } = Route.useSearch()
   const navigate = Route.useNavigate()
+  const router = useRouter()
   const [feedback, setFeedback] = useState<string>()
   const favoriteControl = useFavoriteToggle(nft, setFeedback)
 
@@ -49,7 +50,11 @@ function NftDetailContent({ nft, isMobile, onBack }: { nft: NftDetail; isMobile:
       setFeedback(undefined)
       void navigate({ search: { edition: id }, replace: true, resetScroll: false })
     },
-    () => setFeedback(BUY_UNAVAILABLE),
+    (intent) => {
+      if (intent === 'add') setFeedback(`${nft.name} foi adicionado ao carrinho.`)
+      else void router.navigate({ to: '/cart' })
+    },
+    setFeedback,
   )
 
   return isMobile ? (

@@ -1,6 +1,7 @@
 import { Link } from '@tanstack/react-router'
 import { AccountMenu } from '@/components/auth/account-menu'
 import { cartLabel } from '@/components/ui/count-badge'
+import { useCart } from '@/lib/api/cart'
 import scan1 from '@/assets/figma/scan-1.svg'
 import scan2 from '@/assets/figma/scan-2.svg'
 import scan3 from '@/assets/figma/scan-3.svg'
@@ -31,7 +32,8 @@ function ScanIcon() {
   )
 }
 
-export function MobileTabBar({ cartCount = 0 }: { cartCount?: number }) {
+export function MobileTabBar() {
+  const cartCount = useCart().data?.itemCount ?? 0
   return (
     <nav aria-label="Navegação inferior" className="pointer-events-none fixed inset-x-0 bottom-0 z-40">
       <div className="relative mx-auto max-w-[414px]" style={{ height: MOBILE_TAB_BAR_HEIGHT }}>
@@ -58,13 +60,9 @@ export function MobileTabBar({ cartCount = 0 }: { cartCount?: number }) {
               <ScanIcon />
             </span>
           </button>
-          <button
-            type="button"
-            aria-label={cartLabel(cartCount)}
-            className={`${item} left-[calc(70.53%+10px)]`}
-          >
+          <Link to="/cart" aria-label={cartLabel(cartCount)} className={`${item} left-[calc(70.53%+10px)]`}>
             <img src={cartIcon} alt="" width={20} height={20} />
-          </button>
+          </Link>
           <AccountMenu
             side="top"
             renderLogin={({ onClick }) => (

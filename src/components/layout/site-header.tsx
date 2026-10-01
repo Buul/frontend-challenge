@@ -9,6 +9,7 @@ import { SkipLink } from '@/components/layout/skip-link'
 import { Button } from '@/components/ui/button'
 import { cartLabel, CountBadge } from '@/components/ui/count-badge'
 import { useSearchSubmit } from '@/hooks/use-search-submit'
+import { useCart } from '@/lib/api/cart'
 
 export type NavSection = 'home' | 'market'
 
@@ -61,14 +62,14 @@ function HeaderSearch() {
 }
 
 type SiteHeaderProps = {
-  cartCount?: number
   /** Nav item highlighted for the current screen; the Mercado flow (detail, cart, checkout) uses `market`. */
   active?: NavSection
   /** Hairline under the header, present on the home frame but not on the Mercado-flow frames. */
   bordered?: boolean
 }
 
-export function SiteHeader({ cartCount = 0, active = 'home', bordered = true }: SiteHeaderProps) {
+export function SiteHeader({ active = 'home', bordered = true }: SiteHeaderProps) {
+  const cartCount = useCart().data?.itemCount ?? 0
   return (
     <header className={bordered ? 'hairline-b' : undefined}>
       <SkipLink />
@@ -103,10 +104,10 @@ export function SiteHeader({ cartCount = 0, active = 'home', bordered = true }: 
 
         <div className="flex items-center gap-7">
           <HeaderSearch />
-          <button type="button" aria-label={cartLabel(cartCount)} className="relative rounded-sm hover:opacity-80">
+          <Link to="/cart" aria-label={cartLabel(cartCount)} className="relative rounded-sm hover:opacity-80">
             <img src={cartIcon} alt="" width={24} height={24} />
             <CountBadge count={cartCount} className="absolute top-0 left-[15px] bg-primary" />
-          </button>
+          </Link>
           <AccountMenu
             renderLogin={({ onClick }) => (
               <Button onClick={onClick} className="h-[35px] w-[100px] gap-1 rounded-md text-base font-medium">

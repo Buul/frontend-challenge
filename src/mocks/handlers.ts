@@ -5,6 +5,8 @@ import {
   NFT_SEARCH_MAX_LENGTH,
   NFT_SORTS,
   NFT_TABS,
+  type Cart,
+  type CartItemInput,
   type CollectionId,
   type FavoriteList,
   type FeaturedNftList,
@@ -20,8 +22,9 @@ import {
 } from '@/lib/api/types'
 import type { ApiErrorBody } from '@/lib/api/errors'
 import { compareEth, isEthAmount } from '@/lib/eth'
-import { EMAIL_PATTERN, loginSchema, signupSchema, toFieldErrors } from '@/lib/validation'
+import { cartItemSchema, cartPromoSchema, cartQuantitySchema, EMAIL_PATTERN, loginSchema, signupSchema, toFieldErrors } from '@/lib/validation'
 import { authenticate, registerUser, sessionStore, toPublicUser, verifyCredentials } from './auth'
+import { cartStore } from './cart-store'
 import { featuredNfts, nftDetails, nfts, relatedNfts } from './data'
 import { favoritesStore } from './favorites-store'
 import { conflict, notFound, serviceUnavailable, unauthenticated, validationError } from './http'
@@ -90,6 +93,11 @@ export const handlers: RequestHandler[] = [
       networks: countBy<NetworkId>(NETWORKS, (nft) => nft.network),
       price: { min: prices[0], max: prices[prices.length - 1] },
     })
+  }),
+
+  http.get(`${API}/nfts/suggested`, async () => {
+    await delay(250)
+    return HttpResponse.json<RelatedNftList>({ data: nfts.slice(3, 13) })
   }),
 
   http.get<never, never, NftPage | ApiErrorBody>(`${API}/nfts`, async ({ request }) => {
@@ -172,6 +180,49 @@ export const handlers: RequestHandler[] = [
     const session = authenticate(request)
     if (session) sessionStore.revoke(session.token)
     return new HttpResponse(null, { status: 204 })
+  }),
+
+  http.get<never, never, Cart>(`${API}/cart`, async () => {
+    await delay(200)
+    return HttpResponse.json<Cart>(cartStore.get())
+  }),
+
+  http.post<never, Partial<CartItemInput>, Cart | ApiErrorBody>(`${API}/cart/items`, async ({ request }) => {
+    await delay(400)
+    if (isScenarioActive('cart-error')) return serviceUnavailable()
+    const parsed = cartItemSchema.safeParse(await request.json().catch(() => ({})))
+    if (!parsed.success) return validationError(toFieldErrors(parsed.error), 'Verifique os dados informados.')
+    const result = cartStore.add(parsed.data)
+    if ('error' in result) {
+      if (result.error === 'not-found') return notFound('NFT não encontrado.')
+      if (result.error === 'sold-out') return conflict('Esta edição está esgotada.')
+      return conflict(`Limite de ${result.max} ${result.max === 1 ? 'unidade' : 'unidades'} para esta edição no carrinho.`)
+    }
+    return HttpResponse.json<Cart>(result.cart)
+  }),
+
+  http.patch<never, Partial<CartItemInput>, Cart | ApiErrorBody>(`${API}/cart/items`, async ({ request }) => {
+    await delay(250)
+    if (isScenarioActive('cart-error')) return serviceUnavailable()
+    const parsed = cartQuantitySchema.safeParse(await request.json().catch(() => ({})))
+    if (!parsed.success) return validationError(toFieldErrors(parsed.error), 'Verifique os dados informados.')
+    const result = cartStore.setQuantity(parsed.data)
+    if ('error' in result) {
+      if (result.error === 'not-found') return notFound('Este item não está no carrinho.')
+      if (result.error === 'sold-out') return conflict('Esta edição está esgotada.')
+      return conflict(`Limite de ${result.max} ${result.max === 1 ? 'unidade' : 'unidades'} para esta edição no carrinho.`)
+    }
+    return HttpResponse.json<Cart>(result.cart)
+  }),
+
+  http.post<never, { code?: unknown }, Cart | ApiErrorBody>(`${API}/cart/promo`, async ({ request }) => {
+    await delay(350)
+    if (isScenarioActive('cart-error')) return serviceUnavailable()
+    const parsed = cartPromoSchema.safeParse(await request.json().catch(() => ({})))
+    if (!parsed.success) return validationError(toFieldErrors(parsed.error), 'Verifique o código informado.')
+    const result = cartStore.applyPromo(parsed.data.code)
+    if ('error' in result) return conflict('Código promocional inválido.', { code: 'Código promocional inválido.' })
+    return HttpResponse.json<Cart>(result.cart)
   }),
 
   http.get<never, never, FavoriteList | ApiErrorBody>(`${API}/favorites`, async ({ request }) => {

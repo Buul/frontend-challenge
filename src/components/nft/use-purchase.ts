@@ -1,12 +1,8 @@
 import { useState } from 'react'
+import { useAddToCart } from '@/lib/api/cart'
+import { getErrorMessage } from '@/lib/api/errors'
 import type { NftDetail, NftEdition } from '@/lib/api/types'
 import { multiplyEth } from '@/lib/eth'
-
-export type PurchaseSelection = {
-  nftId: string
-  editionId: string
-  quantity: number
-}
 
 /** Falls back to the first edition with stock when the requested one is missing (e.g. a stale `?edition=` link). */
 const resolveEdition = (editions: NftEdition[], id: string | undefined) =>
@@ -16,8 +12,10 @@ export function usePurchase(
   nft: NftDetail,
   editionId: string | undefined,
   onEditionChange: (id: string) => void,
-  onBuy: (selection: PurchaseSelection) => void,
+  onAdded: (intent: 'buy' | 'add') => void,
+  onError: (message: string) => void,
 ) {
+  const addToCart = useAddToCart()
   const [requested, setRequested] = useState(1)
   const edition = resolveEdition(nft.editions, editionId)
   const soldOut = edition.available === 0
@@ -33,9 +31,21 @@ export function usePurchase(
         ? `Apenas ${edition.available} ${edition.available === 1 ? 'unidade disponível' : 'unidades disponíveis'} nesta edição.`
         : `Limite de ${edition.maxPerOrder} por pedido nesta edição.`
 
+  const submit = (intent: 'buy' | 'add') => {
+    if (soldOut || addToCart.isPending) return
+    addToCart.mutate(
+      { nftId: nft.id, editionId: edition.id, quantity },
+      {
+        onSuccess: () => onAdded(intent),
+        onError: (error) => onError(getErrorMessage(error)),
+      },
+    )
+  }
+
   return {
     edition,
     soldOut,
+    busy: addToCart.isPending,
     quantity,
     maxQuantity,
     total: multiplyEth(nft.price, quantity),
@@ -45,9 +55,8 @@ export function usePurchase(
       setRequested(1)
       onEditionChange(id)
     },
-    buy: () => {
-      if (!soldOut) onBuy({ nftId: nft.id, editionId: edition.id, quantity })
-    },
+    buy: () => submit('buy'),
+    add: () => submit('add'),
   }
 }
 

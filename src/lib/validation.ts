@@ -50,6 +50,31 @@ export const signupFormSchema = signupSchema
     },
   })
 
+const nftId = z.string({ error: 'Informe o NFT.' }).trim().min(1, 'Informe o NFT.').max(64)
+const editionId = z
+  .string({ error: 'Informe a edição.' })
+  .trim()
+  .regex(/^[\w-]{1,32}$/, 'Edição inválida.')
+
+export const cartItemSchema = z.object({
+  nftId,
+  editionId,
+  quantity: z.number({ error: 'Informe a quantidade.' }).int().min(1, 'A quantidade deve ser pelo menos 1.').max(99),
+})
+
+export const cartQuantitySchema = cartItemSchema.extend({
+  quantity: z.number({ error: 'Informe a quantidade.' }).int().min(0).max(99),
+})
+
+export const cartPromoSchema = z.object({
+  code: z
+    .string({ error: 'Informe o código promocional.' })
+    .trim()
+    .min(1, { error: 'Informe o código promocional.', abort: true })
+    .max(32, 'Use até 32 caracteres no código.')
+    .regex(/^[A-Za-z0-9]+$/, 'Use só letras e números no código.'),
+})
+
 /** First message per field, in the `fieldErrors` shape the API answers with. */
 export const toFieldErrors = (error: z.ZodError) =>
   Object.fromEntries(

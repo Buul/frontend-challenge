@@ -9,6 +9,7 @@ const nftKeys = {
   featured: () => [...nftKeys.all, 'featured'] as const,
   detail: (id: string) => [...nftKeys.all, 'detail', id] as const,
   related: (id: string) => [...nftKeys.all, 'related', id] as const,
+  suggested: () => [...nftKeys.all, 'suggested'] as const,
 }
 
 export const nftDetailQueryOptions = (id: string) =>
@@ -43,6 +44,13 @@ export const featuredNftsQueryOptions = () =>
   queryOptions({
     queryKey: nftKeys.featured(),
     queryFn: async ({ signal }) => (await api.get<FeaturedNftList>('/nfts/featured', { signal })).data.data,
+    staleTime: 5 * 60_000,
+  })
+
+export const suggestedNftsQueryOptions = () =>
+  queryOptions({
+    queryKey: nftKeys.suggested(),
+    queryFn: async ({ signal }) => (await api.get<RelatedNftList>('/nfts/suggested', { signal })).data.data,
     staleTime: 5 * 60_000,
   })
 

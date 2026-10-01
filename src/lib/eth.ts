@@ -31,6 +31,20 @@ export function multiplyEth(value: EthAmount, quantity: number): EthAmount {
   return fromWei(toWei(value) * BigInt(quantity))
 }
 
+export function addEth(...values: EthAmount[]): EthAmount {
+  return fromWei(values.reduce((sum, value) => sum + toWei(value), 0n))
+}
+
+export function subtractEth(left: EthAmount, right: EthAmount): EthAmount {
+  return fromWei(toWei(left) - toWei(right))
+}
+
+/** Integer percent 0–100, truncated toward zero in wei. */
+export function percentEth(value: EthAmount, percent: number): EthAmount {
+  if (!Number.isSafeInteger(percent) || percent < 0 || percent > 100) throw new RangeError(`Invalid percent: ${percent}`)
+  return fromWei((toWei(value) * BigInt(percent)) / 100n)
+}
+
 /** Converts to an integer count of `10^-decimals` ETH units, for UI controls that need numbers (e.g. sliders). */
 export function toUnits(value: EthAmount, decimals: number, rounding: 'floor' | 'ceil'): number {
   const unit = 10n ** BigInt(DECIMALS - decimals)

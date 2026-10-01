@@ -6,6 +6,7 @@ import { SessionSync } from '@/components/auth/session-sync'
 import { StatusPage } from '@/components/layout/status-page'
 import { Button } from '@/components/ui/button'
 import { sessionQueryOptions } from '@/lib/api/auth'
+import { cartQueryOptions } from '@/lib/api/cart'
 import { getErrorMessage } from '@/lib/api/errors'
 import { validateAuthSearch } from '@/lib/auth/auth-dialog'
 
@@ -13,8 +14,10 @@ const Devtools = import.meta.env.DEV ? lazy(() => import('@/components/devtools'
 
 export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()({
   validateSearch: validateAuthSearch,
-  // Awaited so private screens and the header know who is signed in before rendering.
-  beforeLoad: ({ context }) => context.queryClient.ensureQueryData(sessionQueryOptions()).catch(() => null),
+  beforeLoad: ({ context }) => {
+    void context.queryClient.prefetchQuery(cartQueryOptions())
+    return context.queryClient.ensureQueryData(sessionQueryOptions()).catch(() => null)
+  },
   component: RootLayout,
   notFoundComponent: NotFound,
   errorComponent: RootError,

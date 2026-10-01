@@ -91,7 +91,7 @@ export function NftDetailDesktop({ nft, purchase, favorite, feedback, shareUrl }
           <div className="flex flex-wrap items-center justify-between gap-4">
             <QuantityStepper value={purchase.quantity} max={purchase.maxQuantity} onChange={purchase.setQuantity} disabled={purchase.soldOut} />
             <div className="flex gap-2">
-              <Button onClick={purchase.buy} disabled={purchase.soldOut} className="h-10 w-[130px] rounded-lg text-sm leading-5 font-bold">
+              <Button onClick={purchase.buy} disabled={purchase.soldOut || purchase.busy} className="h-10 w-[130px] rounded-lg text-sm leading-5 font-bold">
                 COMPRAR
               </Button>
               <FavoriteButton variant="labeled" control={favorite} />

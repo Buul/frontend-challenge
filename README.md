@@ -30,7 +30,7 @@ pnpm dev
 Acesse <http://localhost:4317>.
 
 - O **MSW** é iniciado no navegador com os handlers de `src/mocks/handlers.ts`.
-- Cenários de falha do mock são ativados por `localStorage['kurio:mock-scenarios']` (lista separada por vírgula): `favorites-error` (favoritar/desfavoritar responde 503), `login-error` (login responde 503) e `signup-error` (cadastro responde 503).
+- Cenários de falha do mock são ativados por `localStorage['kurio:mock-scenarios']` (lista separada por vírgula): `favorites-error` (favoritar/desfavoritar responde 503), `login-error` (login responde 503), `signup-error` (cadastro responde 503) e `cart-error` (carrinho responde 503).
 
 ### Sessão
 
@@ -43,9 +43,14 @@ Contas fictícias: `ana@kurio.dev` / `Kurio@123` e `bruno@kurio.dev` / `Kurio@45
 | `GET /auth/session` | `200 { expiresAt, user }` ou `401` |
 | `POST /auth/logout` | `204`, idempotente |
 | `GET /favorites`, `PUT`/`DELETE /favorites/:nftId` | `{ data: string[] }` do usuário autenticado, ou `401` |
+| `GET /cart` | `{ items, itemCount, subtotal, discount, networkFee, total, promoCode? }` — o carrinho vive neste navegador e não exige login |
+| `POST /cart/items` `{ nftId, editionId, quantity }` | Soma à linha existente (mesmo NFT e edição), respeitando estoque e o máximo por pedido; `409` se esgotado ou no limite |
+| `PATCH /cart/items` `{ nftId, editionId, quantity }` | Define a quantidade; `0` remove a linha |
+| `POST /cart/promo` `{ code }` | Aplica um código (`KURIO10` dá 10% sobre o subtotal); `409` se o código for inválido |
 
 - O token vai em `Authorization: Bearer` e fica em `localStorage['kurio:session-token']`, para sobreviver ao refresh e valer entre abas (diferente de um cookie httpOnly, é legível por scripts, aceitável nesta demo).
 - Login e cadastro são um diálogo aberto por `?auth=login` ou `?auth=signup` em qualquer tela, com `redirect=/caminho` opcional (apenas caminhos internos). Alternar entre os dois substitui a entrada do histórico, mantendo o `redirect`. Ações que exigem login (favoritar) abrem o diálogo e são retomadas ao entrar ou ao criar a conta.
+- Comprar no detalhe adiciona ao carrinho (`/cart`). Visitantes podem montar o carrinho; **Conectar e finalizar** pede login. O pagamento ainda não envia pedido.
 - Os formulários de login e cadastro usam TanStack Form, validados por schemas Zod em `src/lib/validation.ts`. O mock valida o corpo das requisições com os mesmos schemas. Regras do cadastro: nome de usuário com 2 a 40 caracteres, e-mail válido, senha com pelo menos 8 caracteres incluindo letras e números, e confirmação igual à senha.
 - Sessão expira em 30 min. Um `401` em requisição autenticada, ou o `expiresAt` vencendo, encerra a sessão e reabre o login sobre a mesma tela. Para simular a expiração no servidor, apague `localStorage['kurio:mock:sessions']`.
 - Dados privados ficam sob a chave de query `['me', userId, ...]`; logout, expiração, troca de usuário e login/logout em outra aba removem essas queries e as mutations pendentes.
