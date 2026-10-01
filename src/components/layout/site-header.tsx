@@ -7,12 +7,20 @@ import { Button } from '@/components/ui/button'
 import { useSearchSubmit } from '@/hooks/use-search-submit'
 import { NFT_SEARCH_MAX_LENGTH } from '@/lib/api/types'
 
-// Sections without a `hash` have no destination yet, so they render as plain text instead of dead links.
-const NAV_SECTIONS: { label: string; hash?: string }[] = [
-  { label: 'Mercado', hash: 'mercado' },
-  { label: 'Criadores' },
-  { label: 'Aprenda', hash: 'blog' },
+export type NavSection = 'home' | 'market'
+
+// Items without a `hash` (other than home) have no destination yet, so they render as plain text instead of dead links.
+const NAV_ITEMS: { id: string; label: string; hash?: string }[] = [
+  { id: 'home', label: 'Início' },
+  { id: 'market', label: 'Mercado', hash: 'mercado' },
+  { id: 'creators', label: 'Criadores' },
+  { id: 'learn', label: 'Aprenda', hash: 'blog' },
 ]
+
+const navItemClass = (active: boolean) =>
+  active
+    ? 'flex flex-col gap-6 font-bold whitespace-nowrap text-brand after:h-[3px] after:w-full after:bg-primary'
+    : 'pb-[27px] whitespace-nowrap'
 
 export function SkipLink() {
   return (
@@ -70,9 +78,17 @@ function HeaderSearch() {
   )
 }
 
-export function SiteHeader({ cartCount = 0 }: { cartCount?: number }) {
+type SiteHeaderProps = {
+  cartCount?: number
+  /** Nav item highlighted for the current screen; the Mercado flow (detail, cart, checkout) uses `market`. */
+  active?: NavSection
+  /** Hairline under the header, present on the home frame but not on the Mercado-flow frames. */
+  bordered?: boolean
+}
+
+export function SiteHeader({ cartCount = 0, active = 'home', bordered = true }: SiteHeaderProps) {
   return (
-    <header className="border-b-[0.3px] border-primary">
+    <header className={bordered ? 'border-b-[0.3px] border-primary' : undefined}>
       <SkipLink />
       <div className="flex flex-wrap items-start justify-between gap-y-4">
         <Link to="/" className="w-40 py-2 text-sm font-bold tracking-[1.4px]" aria-label="Kurio, página inicial">
@@ -80,30 +96,27 @@ export function SiteHeader({ cartCount = 0 }: { cartCount?: number }) {
         </Link>
 
         <nav aria-label="Principal" className="order-last flex w-full gap-10 overflow-x-auto md:order-none md:w-auto">
-          <Link
-            to="/"
-            activeOptions={{ exact: true, includeHash: true, includeSearch: false }}
-            className="flex flex-col gap-6 font-bold text-brand after:h-[3px] after:w-full after:bg-primary"
-          >
-            Início
-          </Link>
-          {NAV_SECTIONS.map(({ label, hash }) =>
-            hash ? (
+          {NAV_ITEMS.map(({ id, label, hash }) => {
+            const isActive = id === active
+            if (id !== 'home' && !hash) {
+              return (
+                <span key={id} className={navItemClass(isActive)}>
+                  {label}
+                </span>
+              )
+            }
+            return (
               <Link
-                key={label}
+                key={id}
                 to="/"
                 hash={hash}
                 activeOptions={{ exact: true, includeHash: true, includeSearch: false }}
-                className="pb-[27px] whitespace-nowrap hover:text-brand"
+                className={`${navItemClass(isActive)} ${isActive ? '' : 'hover:text-brand'}`}
               >
                 {label}
               </Link>
-            ) : (
-              <span key={label} className="pb-[27px] whitespace-nowrap">
-                {label}
-              </span>
-            ),
-          )}
+            )
+          })}
         </nav>
 
         <div className="flex items-center gap-7">

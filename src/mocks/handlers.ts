@@ -6,15 +6,20 @@ import {
   NFT_SORTS,
   NFT_TABS,
   type CollectionId,
+  type FavoriteList,
   type FeaturedNftList,
   type NetworkId,
+  type NftDetail,
   type NftFacets,
   type NftPage,
+  type RelatedNftList,
 } from '@/lib/api/types'
 import type { ApiErrorBody } from '@/lib/api/errors'
 import { compareEth, isEthAmount } from '@/lib/eth'
-import { featuredNfts, nfts } from './data'
-import { validationError } from './http'
+import { featuredNfts, nftDetails, nfts, relatedNfts } from './data'
+import { favoritesStore } from './favorites-store'
+import { notFound, serviceUnavailable, validationError } from './http'
+import { isScenarioActive } from './scenarios'
 
 const API = import.meta.env.VITE_API_URL ?? '/api'
 const PAGE_SIZE = 9
@@ -107,6 +112,35 @@ export const handlers: RequestHandler[] = [
       totalPages: Math.max(1, Math.ceil(filtered.length / PAGE_SIZE)),
     })
   }),
+
+  // Registered after the static `/nfts/*` routes so `featured` and `facets` are never read as ids.
+  http.get<{ id: string }, never, NftDetail | ApiErrorBody>(`${API}/nfts/:id`, async ({ params }) => {
+    await delay(300)
+    const detail = nftDetails.get(params.id)
+    return detail ? HttpResponse.json<NftDetail>(detail) : notFound('NFT não encontrado.')
+  }),
+
+  http.get<{ id: string }, never, RelatedNftList | ApiErrorBody>(`${API}/nfts/:id/related`, async ({ params }) => {
+    await delay(400)
+    if (!nftDetails.has(params.id)) return notFound('NFT não encontrado.')
+    return HttpResponse.json<RelatedNftList>({ data: relatedNfts(params.id) })
+  }),
+
+  http.get(`${API}/favorites`, async () => {
+    await delay(200)
+    return HttpResponse.json<FavoriteList>({ data: favoritesStore.list() })
+  }),
+
+  // PUT and DELETE are idempotent: repeating either leaves the same list.
+  ...(['put', 'delete'] as const).map((method) =>
+    http[method]<{ nftId: string }, never, FavoriteList | ApiErrorBody>(`${API}/favorites/:nftId`, async ({ params }) => {
+      await delay(500)
+      if (isScenarioActive('favorites-error')) return serviceUnavailable()
+      if (!nftDetails.has(params.nftId)) return notFound('NFT não encontrado.')
+      const ids = method === 'put' ? favoritesStore.add(params.nftId) : favoritesStore.remove(params.nftId)
+      return HttpResponse.json<FavoriteList>({ data: ids })
+    }),
+  ),
 
   http.post(`${API}/newsletter`, async ({ request }) => {
     await delay(400)

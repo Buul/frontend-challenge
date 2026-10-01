@@ -1,5 +1,9 @@
+import { Link } from '@tanstack/react-router'
 import arrowDown from '@/assets/figma/arrow-down.svg'
 import arrowRight2 from '@/assets/figma/arrow-right-2.svg'
+import heartIcon from '@/assets/figma/card-heart.svg'
+import { FilledHeart } from '@/components/nft/favorite-heart'
+import { useFavoriteToggle } from '@/components/nft/use-favorite-toggle'
 import { Button } from '@/components/ui/button'
 import { NFT_SORTS, NFT_TABS, type Nft, type NftPage, type NftSort, type NftTab } from '@/lib/api/types'
 import { formatEth } from '@/lib/format'
@@ -17,20 +21,48 @@ type NftGridProps = {
   onPageChange: (page: number) => void
   onRetry: () => void
   onClearFilters: () => void
+  /** Shows the favorite heart on each card (mobile design only) and receives the toggle result. */
+  onFavoriteFeedback?: (message: string) => void
 }
 
-function NftCard({ nft }: { nft: Nft }) {
+function CardFavoriteButton({ nft, onFeedback }: { nft: Nft; onFeedback: (message: string) => void }) {
+  const favorite = useFavoriteToggle(nft, onFeedback)
+
   return (
-    <article className="flex flex-col gap-2 md:gap-3">
+    <button
+      type="button"
+      aria-label={`Favoritar ${nft.name}`}
+      aria-pressed={favorite.active}
+      aria-busy={favorite.busy || undefined}
+      onClick={favorite.onToggle}
+      className={cn(
+        'absolute top-0 right-[7px] z-10 grid size-7 place-items-center rounded-full transition-transform active:scale-90 motion-reduce:transition-none',
+        // Widens the hit area to 44px without moving the 28px icon.
+        'before:absolute before:-inset-2 before:content-[""]',
+        favorite.busy && 'cursor-progress',
+      )}
+    >
+      <img src={heartIcon} alt="" width={28} height={28} className="absolute inset-0" />
+      {favorite.active && <FilledHeart width={15} height={13.35} className="relative bg-primary" />}
+    </button>
+  )
+}
+
+function NftCard({ nft, onFavoriteFeedback }: { nft: Nft; onFavoriteFeedback?: (message: string) => void }) {
+  return (
+    <article className="group relative flex flex-col gap-2 md:gap-3">
       <div className="relative flex aspect-[175/200] items-center justify-center overflow-hidden rounded-[20px] bg-[linear-gradient(139.5deg,var(--card)_12%,var(--surface-raised)_106.6%)] px-1 md:aspect-auto md:h-[300px] md:rounded-none md:bg-card md:bg-none">
-        <img
-          src={nft.image}
-          alt={nft.name}
-          width={250}
-          height={250}
-          loading="lazy"
-          className="aspect-square w-full max-w-[168px] rounded-2xl object-cover md:max-w-[250px] md:rounded-[15px]"
-        />
+        <div className="relative w-full max-w-[168px] md:max-w-[250px]">
+          <img
+            src={nft.image}
+            alt=""
+            width={250}
+            height={250}
+            loading="lazy"
+            className="aspect-square w-full rounded-2xl object-cover transition-transform duration-300 group-hover:scale-[1.02] motion-reduce:transition-none md:rounded-[15px]"
+          />
+          {onFavoriteFeedback && <CardFavoriteButton nft={nft} onFeedback={onFavoriteFeedback} />}
+        </div>
         {nft.isRare && (
           <span className="absolute top-4 left-0 flex h-8 w-[68px] items-center bg-primary px-2 text-[13px] leading-4 font-medium text-primary-foreground">
             RARO
@@ -38,7 +70,16 @@ function NftCard({ nft }: { nft: Nft }) {
         )}
       </div>
       <div className="flex flex-col leading-4 max-md:pl-2 md:gap-1.5">
-        <h3 className="text-[15px] leading-normal md:text-base md:leading-4">{nft.name}</h3>
+        <h3 className="text-[15px] leading-normal md:text-base md:leading-4">
+          {/* The link covers the whole card; the favorite button sits above it so it isn't nested in the link. */}
+          <Link
+            to="/nfts/$nftId"
+            params={{ nftId: nft.id }}
+            className="after:absolute after:inset-0 after:rounded-[20px] after:content-[''] focus-visible:outline-none focus-visible:after:outline-2 focus-visible:after:outline-offset-2 focus-visible:after:outline-ring md:after:rounded-none"
+          >
+            {nft.name}
+          </Link>
+        </h3>
         <p className="flex flex-wrap items-center gap-x-3 text-base md:text-lg">
           <span className="font-bold text-brand">{formatEth(nft.price)}</span>
           {nft.previousPrice !== undefined && (
@@ -127,6 +168,7 @@ export function NftGrid({
   onPageChange,
   onRetry,
   onClearFilters,
+  onFavoriteFeedback,
 }: NftGridProps) {
   return (
     <section id="mercado" aria-labelledby="market-title" className="flex min-w-0 flex-1 flex-col gap-10 md:gap-[88px]">
@@ -191,7 +233,7 @@ export function NftGrid({
               isFetching && result && 'opacity-60 transition-opacity',
             )}
           >
-            {result ? result.data.map((nft) => <NftCard key={nft.id} nft={nft} />) : Array.from({ length: 9 }, (_, i) => <CardSkeleton key={i} />)}
+            {result ? result.data.map((nft) => <NftCard key={nft.id} nft={nft} onFavoriteFeedback={onFavoriteFeedback} />) : Array.from({ length: 9 }, (_, i) => <CardSkeleton key={i} />)}
           </div>
         )}
       </div>

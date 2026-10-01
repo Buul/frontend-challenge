@@ -29,7 +29,9 @@ pnpm dev
 
 Acesse <http://localhost:4317>.
 
-- O **MSW** é iniciado no navegador com a lista de handlers em `src/mocks/handlers.ts` (vazia por padrão).
+- O **MSW** é iniciado no navegador com os handlers de `src/mocks/handlers.ts`.
+- **Favoritos** são do visitante (ainda não há login): `GET /favorites`, `PUT /favorites/:nftId` e `DELETE /favorites/:nftId`, todos respondendo `{ data: string[] }`. O mock persiste a lista em `localStorage['kurio:mock:favorites']`.
+- Cenários de falha do mock são ativados por `localStorage['kurio:mock-scenarios']` (lista separada por vírgula). Disponível: `favorites-error`, em que favoritar/desfavoritar responde 503.
 - O **Socket.IO** roda dentro do próprio servidor do Vite (plugin em `server/realtime.ts`), tanto em `pnpm dev` quanto em `pnpm preview`.
 - Em desenvolvimento, os devtools do TanStack Query e do TanStack Router aparecem nos cantos inferiores.
 - Novos componentes shadcn/ui: `pnpm dlx shadcn@latest add <componente>`.

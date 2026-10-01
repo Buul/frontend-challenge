@@ -40,7 +40,8 @@ export type NftSort = (typeof NFT_SORTS)[number]['id']
 export type NftEdition = {
   id: string
   label: string
-  supply: number
+  /** `null` for open editions, which have no fixed supply. */
+  supply: number | null
   available: number
   maxPerOrder: number
 }
@@ -80,6 +81,47 @@ export type NftPage = {
   pageSize: number
   total: number
   totalPages: number
+}
+
+export type NftImage = {
+  src: string
+  alt: string
+}
+
+export type NftReview = {
+  id: string
+  author: string
+  /** 1 to 5. */
+  rating: number
+  comment: string
+  createdAt: string
+}
+
+export type NftDetail = Nft & {
+  summary: string
+  description: string[]
+  tokenId: string
+  collectionName: string
+  creator: string
+  attributes: string[]
+  images: NftImage[]
+  /** Average from 0 to 5, one decimal place. */
+  rating: number
+  reviewCount: number
+  /** Most recent reviews only; `reviewCount` is the total. */
+  reviews: NftReview[]
+  provenance: string
+  contract: { address: string; standard: string }
+  royaltyPercent: number
+}
+
+export type RelatedNftList = {
+  data: Nft[]
+}
+
+/** Ids of the NFTs favorited by the current visitor. */
+export type FavoriteList = {
+  data: string[]
 }
 
 export type FeaturedNft = Pick<Nft, 'id' | 'name' | 'image' | 'price'> & {

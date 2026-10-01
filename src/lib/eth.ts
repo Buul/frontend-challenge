@@ -26,6 +26,11 @@ export function compareEth(a: EthAmount, b: EthAmount): -1 | 0 | 1 {
   return diff === 0n ? 0 : diff > 0n ? 1 : -1
 }
 
+export function multiplyEth(value: EthAmount, quantity: number): EthAmount {
+  if (!Number.isSafeInteger(quantity) || quantity < 0) throw new RangeError(`Invalid quantity: ${quantity}`)
+  return fromWei(toWei(value) * BigInt(quantity))
+}
+
 /** Converts to an integer count of `10^-decimals` ETH units, for UI controls that need numbers (e.g. sliders). */
 export function toUnits(value: EthAmount, decimals: number, rounding: 'floor' | 'ceil'): number {
   const unit = 10n ** BigInt(DECIMALS - decimals)
