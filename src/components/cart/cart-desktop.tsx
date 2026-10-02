@@ -66,6 +66,7 @@ function CartRow({
 type CartDesktopProps = {
   cart: Cart
   pending?: boolean
+  signedIn?: boolean
   notice?: string
   onQuantity: (item: CartItem, quantity: number) => void
   onRemove: (item: CartItem) => void
@@ -73,7 +74,7 @@ type CartDesktopProps = {
   onCheckout: () => void
 }
 
-export function CartDesktop({ cart, pending, notice, onQuantity, onRemove, onApplyPromo, onCheckout }: CartDesktopProps) {
+export function CartDesktop({ cart, pending, signedIn, notice, onQuantity, onRemove, onApplyPromo, onCheckout }: CartDesktopProps) {
   return (
     <div className="flex flex-col gap-3">
       <h1 className="sr-only">Carrinho de NFTs</h1>
@@ -101,7 +102,7 @@ export function CartDesktop({ cart, pending, notice, onQuantity, onRemove, onApp
           )}
         </div>
         <div className="w-full shrink-0 lg:w-[332px]">
-          <CartSummary cart={cart} layout="desktop" pending={pending} notice={notice} onApplyPromo={onApplyPromo} onCheckout={onCheckout} />
+          <CartSummary cart={cart} layout="desktop" pending={pending} signedIn={signedIn} notice={notice} onApplyPromo={onApplyPromo} onCheckout={onCheckout} />
         </div>
       </div>
     </div>

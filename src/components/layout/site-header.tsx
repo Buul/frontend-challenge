@@ -1,4 +1,4 @@
-import { Link, useSearch } from '@tanstack/react-router'
+import { Link, useRouterState, useSearch } from '@tanstack/react-router'
 import { useRef, useState } from 'react'
 import cartIcon from '@/assets/figma/cart.svg'
 import loginIcon from '@/assets/figma/login.svg'
@@ -10,21 +10,30 @@ import { Button } from '@/components/ui/button'
 import { cartLabel, CountBadge } from '@/components/ui/count-badge'
 import { useSearchSubmit } from '@/hooks/use-search-submit'
 import { useCart } from '@/lib/api/cart'
+import { cn } from '@/lib/utils'
 
 export type NavSection = 'home' | 'market'
 
-// Items without a `hash` (other than home) have no destination yet, so they render as plain text instead of dead links.
-const NAV_ITEMS: { id: string; label: string; hash?: string }[] = [
+const NAV_ITEMS: { id: 'home' | 'market' | 'creators' | 'learn'; label: string; hash?: string }[] = [
   { id: 'home', label: 'Início' },
   { id: 'market', label: 'Mercado', hash: 'mercado' },
-  { id: 'creators', label: 'Criadores' },
+  { id: 'creators', label: 'Criadores', hash: 'criadores' },
   { id: 'learn', label: 'Aprenda', hash: 'blog' },
 ]
 
+const SECTION_BY_HASH: Record<string, (typeof NAV_ITEMS)[number]['id']> = {
+  mercado: 'market',
+  criadores: 'creators',
+  blog: 'learn',
+}
+
 const navItemClass = (active: boolean) =>
-  active
-    ? 'flex flex-col gap-6 font-bold whitespace-nowrap text-brand after:h-[3px] after:w-full after:bg-primary'
-    : 'pb-[27px] whitespace-nowrap'
+  cn(
+    'relative shrink-0 py-3 whitespace-nowrap',
+    active
+      ? 'font-bold text-brand after:absolute after:inset-x-0 after:bottom-0 after:h-[3px] after:bg-primary'
+      : 'hover:text-brand',
+  )
 
 function HeaderSearch() {
   const onSubmit = useSearchSubmit()
@@ -70,39 +79,34 @@ type SiteHeaderProps = {
 
 export function SiteHeader({ active = 'home', bordered = true }: SiteHeaderProps) {
   const cartCount = useCart().data?.itemCount ?? 0
+  const { pathname, hash } = useRouterState({
+    select: (state) => ({ pathname: state.location.pathname, hash: state.location.hash.replace(/^#/, '') }),
+  })
+  const current = pathname === '/' ? (SECTION_BY_HASH[hash] ?? 'home') : active
+
   return (
     <header className={bordered ? 'hairline-b' : undefined}>
       <SkipLink />
-      <div className="flex flex-wrap items-start justify-between gap-y-4">
-        <Link to="/" className="w-40 py-2 text-sm font-bold tracking-[1.4px]" aria-label="Kurio, página inicial">
+      <div className="flex items-center justify-between gap-4">
+        <Link to="/" className="w-40 shrink-0 py-2 text-sm font-bold tracking-[1.4px]" aria-label="Kurio, página inicial">
           KURIO
         </Link>
 
-        <nav aria-label="Principal" className="order-last flex w-full gap-10 overflow-x-auto md:order-none md:w-auto">
-          {NAV_ITEMS.map(({ id, label, hash }) => {
-            const isActive = id === active
-            if (id !== 'home' && !hash) {
-              return (
-                <span key={id} className={navItemClass(isActive)}>
-                  {label}
-                </span>
-              )
-            }
-            return (
-              <Link
-                key={id}
-                to="/"
-                hash={hash}
-                activeOptions={{ exact: true, includeHash: true, includeSearch: false }}
-                className={`${navItemClass(isActive)} ${isActive ? '' : 'hover:text-brand'}`}
-              >
-                {label}
-              </Link>
-            )
-          })}
+        <nav aria-label="Principal" className="flex min-w-0 flex-1 items-center justify-center gap-6 overflow-x-auto xl:gap-10">
+          {NAV_ITEMS.map(({ id, label, hash: itemHash }) => (
+            <Link
+              key={id}
+              to="/"
+              hash={itemHash}
+              activeOptions={{ exact: true, includeHash: true, includeSearch: false }}
+              className={navItemClass(id === current)}
+            >
+              {label}
+            </Link>
+          ))}
         </nav>
 
-        <div className="flex items-center gap-7">
+        <div className="flex shrink-0 items-center gap-4 xl:gap-7">
           <HeaderSearch />
           <Link to="/cart" aria-label={cartLabel(cartCount)} className="relative rounded-sm hover:opacity-80">
             <img src={cartIcon} alt="" width={24} height={24} />

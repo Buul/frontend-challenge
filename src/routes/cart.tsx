@@ -73,6 +73,7 @@ function CartPage() {
       <CartMobile
         cart={cart.data}
         pending={pending}
+        signedIn={Boolean(user)}
         notice={notice}
         onBack={onBack}
         onQuantity={setQuantity}
@@ -84,6 +85,7 @@ function CartPage() {
       <CartDesktop
         cart={cart.data}
         pending={pending}
+        signedIn={Boolean(user)}
         notice={notice}
         onQuantity={setQuantity}
         onRemove={onRemove}

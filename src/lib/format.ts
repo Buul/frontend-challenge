@@ -19,6 +19,14 @@ const dateFormatter = new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: 
 
 export const formatDate = (iso: string) => dateFormatter.format(new Date(iso))
 
+const receiptMonth = new Intl.DateTimeFormat('en-US', { month: 'short', timeZone: 'UTC' })
+
+/** `29 Jul, 2026` — day-first date used on the order receipt. */
+export const formatReceiptDate = (iso: string) => {
+  const date = new Date(iso)
+  return `${date.getUTCDate()} ${receiptMonth.format(date)}, ${date.getUTCFullYear()}`
+}
+
 /** `0x7A42...19E8` style shortening for on-chain addresses. */
 export const shortenAddress = (address: string) => `${address.slice(0, 6)}...${address.slice(-4)}`
 

@@ -1,4 +1,4 @@
-import type { User } from '@/lib/api/types'
+import { ENS_SUFFIXES, type CollectorProfile, type EnsSuffix, type ProfileUpdateRequest, type User } from '@/lib/api/types'
 import { isRecord, persisted } from './storage'
 
 type UserRecord = User & {
@@ -46,9 +46,57 @@ const registeredUsers = persisted<UserRecord[]>(
   (value) => Array.isArray(value) && value.every(isUserRecord),
 )
 
-const allUsers = () => [...fixtureUsers, ...registeredUsers.read()]
+type StoredProfile = Pick<CollectorProfile, 'username' | 'ensName' | 'ensSuffix' | 'walletNickname'>
+
+type AccountOverride = {
+  name?: string
+  email?: string
+  passwordHash?: string
+  salt?: string
+  profile?: StoredProfile
+}
+
+const isEnsSuffix = (value: unknown): value is EnsSuffix => ENS_SUFFIXES.some((item) => item.id === value)
+
+const isStoredProfile = (value: unknown): value is StoredProfile =>
+  isRecord(value) &&
+  typeof value.username === 'string' &&
+  typeof value.ensName === 'string' &&
+  isEnsSuffix(value.ensSuffix) &&
+  typeof value.walletNickname === 'string'
+
+const isAccountOverride = (value: unknown): value is AccountOverride =>
+  isRecord(value) &&
+  (value.name === undefined || typeof value.name === 'string') &&
+  (value.email === undefined || typeof value.email === 'string') &&
+  (value.passwordHash === undefined || typeof value.passwordHash === 'string') &&
+  (value.salt === undefined || typeof value.salt === 'string') &&
+  (value.profile === undefined || isStoredProfile(value.profile))
+
+/** Name, e-mail, password and collector fields saved from the profile screen, including for the fixture accounts. */
+const accountOverrides = persisted<Record<string, AccountOverride>>(
+  'kurio:mock:profiles',
+  () => ({}),
+  (value) => isRecord(value) && Object.values(value).every(isAccountOverride),
+)
+
+const materialize = (user: UserRecord): UserRecord => {
+  const extra = accountOverrides.read()[user.id]
+  if (!extra) return user
+  return {
+    ...user,
+    name: extra.name ?? user.name,
+    email: extra.email ?? user.email,
+    passwordHash: extra.passwordHash ?? user.passwordHash,
+    salt: extra.salt ?? user.salt,
+  }
+}
+
+const allUsers = () => [...fixtureUsers, ...registeredUsers.read()].map(materialize)
 const normalizeEmail = (email: string) => email.trim().toLowerCase()
 const findByEmail = (email: string) => allUsers().find((candidate) => candidate.email === normalizeEmail(email))
+
+const asEnsSuffix = (value: string): EnsSuffix | undefined => ENS_SUFFIXES.find((item) => item.id === value)?.id
 
 export const toPublicUser = ({ id, name, email }: UserRecord): User => ({ id, name, email })
 
@@ -67,6 +115,65 @@ export async function registerUser(input: { name: string; email: string; passwor
   if (findByEmail(user.email)) return undefined
   registeredUsers.write([...registeredUsers.read(), user])
   return user
+}
+
+/** Profile shown on `/profile`. Unset collector fields stay empty until the first save. */
+export function collectorProfile(user: UserRecord): CollectorProfile {
+  const stored = accountOverrides.read()[user.id]?.profile
+  return {
+    displayName: user.name,
+    username: stored?.username ?? '',
+    email: user.email,
+    ensName: stored?.ensName ?? '',
+    ensSuffix: stored?.ensSuffix ?? 'eth',
+    walletNickname: stored?.walletNickname ?? '',
+  }
+}
+
+export type ProfileUpdateResult =
+  | { user: UserRecord; profile: CollectorProfile }
+  | { error: 'missing' | 'email-taken' | 'wrong-password' }
+
+/** Applies a profile save. Fixture accounts keep their original row; the override wins on the next read. */
+export async function updateCollectorProfile(userId: string, input: ProfileUpdateRequest): Promise<ProfileUpdateResult> {
+  const base = [...fixtureUsers, ...registeredUsers.read()].find((candidate) => candidate.id === userId)
+  if (!base) return { error: 'missing' }
+
+  const current = materialize(base)
+  const email = normalizeEmail(input.email)
+  if (allUsers().some((candidate) => candidate.id !== userId && candidate.email === email)) return { error: 'email-taken' }
+
+  const ensSuffix = asEnsSuffix(input.ensSuffix)
+  if (!ensSuffix) return { error: 'missing' }
+
+  const overrides = accountOverrides.read()
+  const previous = overrides[userId]
+  let passwordHash = previous?.passwordHash
+  let salt = previous?.salt
+  if (input.newPassword) {
+    const passwordOk = await verifyCredentials(current.email, input.currentPassword ?? '')
+    if (!passwordOk) return { error: 'wrong-password' }
+    salt = toHex(crypto.getRandomValues(new Uint8Array(16)).buffer)
+    passwordHash = await hashPassword(input.newPassword, salt)
+  }
+
+  accountOverrides.write({
+    ...overrides,
+    [userId]: {
+      name: input.displayName.trim(),
+      email,
+      passwordHash,
+      salt,
+      profile: {
+        username: input.username.trim(),
+        ensName: input.ensName.trim(),
+        ensSuffix,
+        walletNickname: input.walletNickname.trim(),
+      },
+    },
+  })
+
+  return { user: materialize(base), profile: collectorProfile(materialize(base)) }
 }
 
 export async function verifyCredentials(email: string, password: string) {

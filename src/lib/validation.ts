@@ -75,14 +75,31 @@ const oneOf = (ids: readonly string[], message: string) =>
 
 const WALLET_ADDRESS = /^(0x[a-fA-F0-9]{40}|[a-z0-9-]+(\.[a-z0-9-]+)*\.(eth|sol))$/
 
+const displayName = z
+  .string({ error: 'Informe o nome de exibição.' })
+  .trim()
+  .min(1, { error: 'Informe o nome de exibição.', abort: true })
+  .min(2, 'Use de 2 a 40 caracteres no nome de exibição.')
+  .max(40, 'Use de 2 a 40 caracteres no nome de exibição.')
+
+const ensName = z
+  .string({ error: 'Informe o nome ENS.' })
+  .trim()
+  .min(1, { error: 'Informe o nome ENS.', abort: true })
+  .regex(/^[\p{L}\d-]{2,32}$/u, 'Use de 2 a 32 letras, números ou hífen.')
+
+const ensSuffix = oneOf(ENS_SUFFIXES.map(({ id }) => id), 'Selecione o sufixo ENS.')
+
+const walletNickname = z
+  .string({ error: 'Informe o apelido da carteira.' })
+  .trim()
+  .min(1, { error: 'Informe o apelido da carteira.', abort: true })
+  .min(2, 'Use de 2 a 40 caracteres no apelido da carteira.')
+  .max(40, 'Use de 2 a 40 caracteres no apelido da carteira.')
+
 /** Body of `POST /orders`. The desktop form collects the profile; mobile sends the signed-in collector and the chosen wallet. */
 export const checkoutSchema = z.object({
-  displayName: z
-    .string({ error: 'Informe o nome de exibição.' })
-    .trim()
-    .min(1, { error: 'Informe o nome de exibição.', abort: true })
-    .min(2, 'Use de 2 a 40 caracteres no nome de exibição.')
-    .max(40, 'Use de 2 a 40 caracteres no nome de exibição.'),
+  displayName,
   username,
   network: oneOf(NETWORKS.map(({ id }) => id), 'Selecione uma rede.'),
   profileName: z
@@ -105,15 +122,68 @@ export const checkoutSchema = z.object({
     .max(32, 'Use até 32 caracteres no código.')
     .regex(/^[A-Za-z0-9]+$/, 'Use só letras e números no código.'),
   email,
-  ensName: z
-    .string({ error: 'Informe o nome ENS.' })
-    .trim()
-    .min(1, { error: 'Informe o nome ENS.', abort: true })
-    .regex(/^[\p{L}\d-]{2,32}$/u, 'Use de 2 a 32 letras, números ou hífen.'),
-  ensSuffix: oneOf(ENS_SUFFIXES.map(({ id }) => id), 'Selecione o sufixo ENS.'),
+  ensName,
+  ensSuffix,
   useOtherWallet: z.boolean(),
   notes: z.string().trim().max(280, 'Use até 280 caracteres na observação.'),
 })
+
+/** Body of `PATCH /auth/profile`. An empty password pair means the password stays as it is. */
+export const profileSchema = z.object({
+  displayName,
+  username,
+  email,
+  ensName,
+  ensSuffix,
+  walletNickname,
+})
+
+const passwordTouched = (value: unknown) => {
+  if (typeof value !== 'object' || value === null) return false
+  const fields = value as { currentPassword?: unknown; newPassword?: unknown; confirmPassword?: unknown }
+  return [fields.currentPassword, fields.newPassword, fields.confirmPassword].some(
+    (field) => typeof field === 'string' && field.length > 0,
+  )
+}
+
+const passwordRule = `Use pelo menos ${PASSWORD_MIN_LENGTH} caracteres, com letras e números.`
+
+/** The profile form adds a password change that is checked only when one of the three fields is filled. */
+export const profileFormSchema = profileSchema
+  .extend({
+    currentPassword: z.string(),
+    newPassword: z.string(),
+    confirmPassword: z.string(),
+  })
+  .refine((value) => value.currentPassword !== '', {
+    path: ['currentPassword'],
+    error: 'Informe a senha atual.',
+    when: ({ value }) => passwordTouched(value),
+  })
+  .refine((value) => newPassword.safeParse(value.newPassword).success, {
+    path: ['newPassword'],
+    error: passwordRule,
+    when: ({ value }) => passwordTouched(value),
+  })
+  .refine((value) => value.newPassword === value.confirmPassword, {
+    path: ['confirmPassword'],
+    error: 'As senhas não coincidem.',
+    when: ({ value }) => passwordTouched(value),
+  })
+
+export const profileUpdateSchema = profileSchema
+  .extend({
+    currentPassword: z.string().optional(),
+    newPassword: z.string().optional(),
+  })
+  .refine((value) => !value.newPassword || Boolean(value.currentPassword), {
+    path: ['currentPassword'],
+    error: 'Informe a senha atual.',
+  })
+  .refine((value) => (!value.currentPassword && !value.newPassword) || newPassword.safeParse(value.newPassword ?? '').success, {
+    path: ['newPassword'],
+    error: passwordRule,
+  })
 
 export const cartPromoSchema = z.object({
   code: z

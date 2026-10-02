@@ -2,6 +2,7 @@ import { delay, http, HttpResponse, type RequestHandler } from 'msw'
 import {
   COLLECTIONS,
   NETWORKS,
+  WALLETS,
   NFT_SEARCH_MAX_LENGTH,
   NFT_SORTS,
   NFT_TABS,
@@ -17,16 +18,19 @@ import {
   type NftFacets,
   type NftPage,
   type RelatedNftList,
+  type ProfileUpdateRequest,
+  type ProfileUpdateResponse,
   type Session,
   type SessionInfo,
   type SignupRequest,
+  type CollectorProfile,
 } from '@/lib/api/types'
 import type { ApiErrorBody } from '@/lib/api/errors'
 import { compareEth, isEthAmount } from '@/lib/eth'
 import { shortenAddress } from '@/lib/format'
 import type { CheckoutRequest } from '@/lib/api/orders'
-import { cartItemSchema, cartPromoSchema, cartQuantitySchema, checkoutSchema, EMAIL_PATTERN, loginSchema, signupSchema, toFieldErrors } from '@/lib/validation'
-import { authenticate, registerUser, sessionStore, toPublicUser, verifyCredentials } from './auth'
+import { cartItemSchema, cartPromoSchema, cartQuantitySchema, checkoutSchema, EMAIL_PATTERN, loginSchema, profileUpdateSchema, signupSchema, toFieldErrors } from '@/lib/validation'
+import { authenticate, collectorProfile, registerUser, sessionStore, toPublicUser, updateCollectorProfile, verifyCredentials } from './auth'
 import { cartStore } from './cart-store'
 import { featuredNfts, nftDetails, nfts, relatedNfts } from './data'
 import { favoritesStore } from './favorites-store'
@@ -190,6 +194,40 @@ export const handlers: RequestHandler[] = [
     return new HttpResponse(null, { status: 204 })
   }),
 
+  http.get<never, never, CollectorProfile | ApiErrorBody>(`${API}/auth/profile`, async ({ request }) => {
+    await delay(200)
+    const session = authenticate(request)
+    if (!session) return unauthenticated()
+    return HttpResponse.json<CollectorProfile>(collectorProfile(session.user))
+  }),
+
+  http.patch<never, Partial<ProfileUpdateRequest>, ProfileUpdateResponse | ApiErrorBody>(`${API}/auth/profile`, async ({ request }) => {
+    await delay(400)
+    if (isScenarioActive('profile-error')) return serviceUnavailable()
+    const session = authenticate(request)
+    if (!session) return unauthenticated()
+
+    const parsed = profileUpdateSchema.safeParse(await request.json().catch(() => ({})))
+    if (!parsed.success) return validationError(toFieldErrors(parsed.error), 'Verifique os dados informados.')
+
+    const ensSuffix = parsed.data.ensSuffix === 'sol' ? 'sol' : parsed.data.ensSuffix === 'eth' ? 'eth' : undefined
+    if (!ensSuffix) return validationError({ ensSuffix: 'Selecione o sufixo ENS.' }, 'Verifique os dados informados.')
+
+    const result = await updateCollectorProfile(session.user.id, { ...parsed.data, ensSuffix })
+    if ('error' in result) {
+      if (result.error === 'email-taken') {
+        const message = 'Já existe uma conta com este e-mail. Use outro e-mail.'
+        return conflict(message, { email: message })
+      }
+      if (result.error === 'wrong-password') {
+        return validationError({ currentPassword: 'A senha atual não confere.' }, 'Verifique os dados informados.')
+      }
+      return unauthenticated()
+    }
+
+    return HttpResponse.json<ProfileUpdateResponse>({ user: toPublicUser(result.user), profile: result.profile })
+  }),
+
   http.get<never, never, Cart>(`${API}/cart`, async () => {
     await delay(200)
     return HttpResponse.json<Cart>(cartStore.get())
@@ -245,14 +283,23 @@ export const handlers: RequestHandler[] = [
     if ('error' in taken) return conflict('Seu carrinho está vazio.')
 
     const network = NETWORKS.find((item) => item.id === parsed.data.network)
+    const wallet = WALLETS.find((item) => item.id === parsed.data.walletType)
     const { cart } = taken
     return HttpResponse.json<Order>({
       id: `KR-${crypto.randomUUID().slice(0, 8).toUpperCase()}`,
       txId: transactionId(),
       createdAt: new Date().toISOString(),
       walletLabel: parsed.data.walletAddress.includes('.') ? parsed.data.walletAddress : shortenAddress(parsed.data.walletAddress),
+      walletName: wallet?.label ?? 'Carteira',
       networkLabel: network?.label ?? 'Ethereum',
-      items: cart.items.map(({ name, image, editionLabel, quantity, lineTotal }) => ({ name, image, editionLabel, quantity, lineTotal })),
+      items: cart.items.map(({ name, image, tokenId, editionLabel, quantity, lineTotal }) => ({
+        name,
+        image,
+        tokenId,
+        editionLabel,
+        quantity,
+        lineTotal,
+      })),
       subtotal: cart.subtotal,
       discount: cart.discount,
       networkFee: cart.networkFee,

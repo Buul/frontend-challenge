@@ -1,4 +1,5 @@
 import { Menu } from '@base-ui/react/menu'
+import { Link } from '@tanstack/react-router'
 import { useState, type ReactElement } from 'react'
 import { useLogout, useSession } from '@/lib/api/auth'
 import { useAuthDialog } from '@/lib/auth/auth-dialog'
@@ -37,6 +38,12 @@ export function AccountMenu({ renderLogin, trigger, side = 'bottom' }: AccountMe
                   </Menu.GroupLabel>
                 </Menu.Group>
                 <Menu.Separator className="my-1 h-px bg-border" />
+                <Menu.Item
+                  render={<Link to="/profile" />}
+                  className="cursor-pointer rounded-[6px] px-3 py-2 outline-none data-highlighted:bg-surface-raised data-highlighted:text-brand"
+                >
+                  Meu perfil
+                </Menu.Item>
                 <Menu.Item
                   onClick={() =>
                     logout.mutate(undefined, { onSettled: () => setAnnouncement('Você saiu da sua conta.') })

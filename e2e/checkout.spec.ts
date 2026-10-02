@@ -9,7 +9,7 @@ async function openCheckout(page: Page) {
   await signInAt(page, '/nfts/nft-1?edition=open', USERS.ana)
   await buy(page).click()
   await expect(page).toHaveURL(/\/cart$/)
-  await page.getByRole('button', { name: 'Conectar e finalizar' }).click()
+  await page.getByRole('button', { name: 'Finalizar', exact: true }).click()
   await expect(page).toHaveURL(/\/checkout$/)
 }
 

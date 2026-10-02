@@ -1,4 +1,5 @@
 import { useMutation } from '@tanstack/react-query'
+import { Link } from '@tanstack/react-router'
 import { Button } from '@/components/ui/button'
 import { getErrorMessage } from '@/lib/api/errors'
 import { subscribeNewsletter } from '@/lib/api/nfts'
@@ -12,6 +13,7 @@ import youtube from '@/assets/figma/social-youtube.svg'
 const FEATURES = [
   { letter: 'W', title: 'Segurança da carteira', text: 'Proteja sua carteira e colecione arte digital verificada com confiança.' },
   {
+    id: 'criadores',
     letter: 'C',
     title: 'Criadores em destaque',
     text: 'Conheça artistas, estúdios e comunidades que moldam a cultura digital na rede.',
@@ -92,8 +94,8 @@ export function SiteFooter({ className }: { className?: string }) {
   return (
     <footer className={cn('flex flex-col', className)}>
       <div className="flex flex-col gap-8 bg-card p-8 lg:flex-row lg:items-stretch lg:justify-between lg:gap-0">
-        {FEATURES.map(({ letter, title, text }) => (
-          <div key={title} className="flex flex-col gap-3 px-4 lg:min-w-0 lg:flex-1 lg:border-r lg:border-primary">
+        {FEATURES.map(({ letter, title, text, id }) => (
+          <div key={title} id={id} className="flex scroll-mt-8 flex-col gap-3 px-4 lg:min-w-0 lg:flex-1 lg:border-r lg:border-primary">
             <span aria-hidden className="grid size-[74px] place-items-center rounded-full bg-primary text-2xl font-bold text-primary-foreground">
               {letter}
             </span>
@@ -126,7 +128,15 @@ export function SiteFooter({ className }: { className?: string }) {
               <h2 className="text-lg leading-4 font-bold">{title}</h2>
               <ul className="text-sm leading-[30px]">
                 {links.map((link) => (
-                  <li key={link}>{link}</li>
+                  <li key={link}>
+                    {link === 'Meu perfil' ? (
+                      <Link to="/profile" className="hover:text-brand">
+                        {link}
+                      </Link>
+                    ) : (
+                      link
+                    )}
+                  </li>
                 ))}
               </ul>
             </div>

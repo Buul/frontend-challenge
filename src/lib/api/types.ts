@@ -167,6 +167,7 @@ export type Cart = {
 export type OrderLine = {
   name: string
   image: string
+  tokenId: string
   editionLabel: string
   quantity: number
   lineTotal: EthAmount
@@ -178,6 +179,7 @@ export type Order = {
   txId: string
   createdAt: string
   walletLabel: string
+  walletName: string
   networkLabel: string
   items: OrderLine[]
   subtotal: EthAmount
@@ -190,6 +192,27 @@ export type User = {
   id: string
   name: string
   email: string
+}
+
+/** Collector profile edited on `/profile`. `displayName` and `email` are the account's public name and e-mail. */
+export type CollectorProfile = {
+  displayName: string
+  username: string
+  email: string
+  ensName: string
+  ensSuffix: EnsSuffix
+  walletNickname: string
+}
+
+/** Body of `PATCH /auth/profile`. Password fields are omitted when the collector is not changing the password. */
+export type ProfileUpdateRequest = CollectorProfile & {
+  currentPassword?: string
+  newPassword?: string
+}
+
+export type ProfileUpdateResponse = {
+  user: User
+  profile: CollectorProfile
 }
 
 export type LoginRequest = {

@@ -8,12 +8,13 @@ type CartSummaryProps = {
   cart: Cart
   layout: 'desktop' | 'mobile'
   pending?: boolean
+  signedIn?: boolean
   notice?: string
   onApplyPromo: (code: string) => void
   onCheckout: () => void
 }
 
-export function CartSummary({ cart, layout, pending, notice, onApplyPromo, onCheckout }: CartSummaryProps) {
+export function CartSummary({ cart, layout, pending, signedIn, notice, onApplyPromo, onCheckout }: CartSummaryProps) {
   const [code, setCode] = useState(cart.promoCode ?? '')
   const isMobile = layout === 'mobile'
   const empty = cart.itemCount === 0
@@ -108,7 +109,7 @@ export function CartSummary({ cart, layout, pending, notice, onApplyPromo, onChe
               : 'h-10 rounded-[3px] text-[15px] leading-4',
           )}
         >
-          Conectar e finalizar
+          {signedIn ? 'Finalizar' : 'Conectar e finalizar'}
         </button>
         {!isMobile && (
           <Link to="/" hash="mercado" className="rounded-sm text-[15px] text-brand hover:underline">
