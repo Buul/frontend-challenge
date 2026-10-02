@@ -4,6 +4,10 @@ import { CartSummary } from '@/components/cart/cart-summary'
 import { QuantityStepper } from '@/components/nft/quantity-stepper'
 import type { Cart, CartItem } from '@/lib/api/types'
 import { formatEth } from '@/lib/format'
+import { cn } from '@/lib/utils'
+
+// Header and rows are separate grids, so the tracks must not depend on content (`auto`) or they drift apart.
+const CART_COLUMNS = 'grid-cols-[minmax(0,2.3fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_24px]'
 
 export function CartBreadcrumb() {
   return (
@@ -47,7 +51,7 @@ function CartRow({
   const max = Math.max(1, Math.min(item.available, item.maxPerOrder))
 
   return (
-    <article className="grid h-[70px] grid-cols-[minmax(12rem,1.4fr)_auto_auto_minmax(5.5rem,1fr)_24px] items-center gap-4 bg-card pr-6">
+    <article className={cn('grid h-[70px] items-center gap-4 bg-card pr-6', CART_COLUMNS)}>
       <Link to="/nfts/$nftId" params={{ nftId: item.nftId }} search={{ edition: item.editionId }} className="flex h-full items-center gap-4 rounded-sm">
         <img src={item.image} alt="" width={70} height={70} className="size-[70px] rounded-md object-cover" />
         <div className="flex min-w-0 flex-col gap-1.5">
@@ -57,7 +61,7 @@ function CartRow({
       </Link>
       <p className="text-base leading-4 font-bold text-muted-foreground">{formatEth(item.unitPrice)}</p>
       <QuantityStepper size="sm" value={item.quantity} max={max} onChange={onQuantity} />
-      <p className="text-right text-base leading-4 font-bold text-brand">{formatEth(item.lineTotal)}</p>
+      <p className="text-base leading-4 font-bold text-brand">{formatEth(item.lineTotal)}</p>
       <RemoveButton name={item.name} onRemove={onRemove} />
     </article>
   )
@@ -81,7 +85,7 @@ export function CartDesktop({ cart, pending, signedIn, notice, onQuantity, onRem
       <CartBreadcrumb />
       <div className="flex flex-col gap-8 lg:flex-row lg:items-start lg:justify-between">
         <div className="flex min-w-0 flex-1 flex-col gap-3 lg:max-w-[782px]">
-          <div className="grid grid-cols-[minmax(12rem,1.4fr)_auto_auto_minmax(5.5rem,1fr)_24px] items-center gap-4 pr-6">
+          <div className={cn('grid items-center gap-4 pr-6', CART_COLUMNS)}>
             <p className="text-base leading-4 font-bold">NFTs</p>
             <p className="text-base leading-4 font-medium">Preço</p>
             <p className="text-base leading-4 font-bold">Edições</p>

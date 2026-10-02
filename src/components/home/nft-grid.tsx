@@ -202,7 +202,7 @@ export function NftGrid({
             className={cn(
               // Mobile staggers the right column 32px down, as in the design.
               'grid grid-cols-2 gap-x-4 gap-y-6 pb-8 [&>*:nth-child(even)]:translate-y-8',
-              'md:gap-x-6 md:gap-y-[72px] md:pb-0 md:[&>*:nth-child(even)]:translate-y-0 xl:grid-cols-[repeat(3,258px)] xl:justify-between',
+              'md:gap-x-6 md:gap-y-[72px] md:pb-0 md:[&>*:nth-child(even)]:translate-y-0 xl:grid-cols-3 min-[1440px]:grid-cols-[repeat(3,258px)] min-[1440px]:justify-between',
               isFetching && result && 'opacity-60 transition-opacity',
             )}
           >

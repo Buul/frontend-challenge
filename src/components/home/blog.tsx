@@ -46,7 +46,7 @@ export function Blog() {
         </p>
       </div>
 
-      <div className="grid w-full gap-6 sm:grid-cols-2 lg:grid-cols-[repeat(4,268px)]">
+      <div className="grid w-full gap-6 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-[repeat(4,268px)]">
         {POSTS.map((post) => (
           <article key={post.title} className="flex flex-col overflow-hidden rounded-lg bg-card">
             <img src={post.image} alt="" width={268} height={195} loading="lazy" className="h-[195px] w-full object-cover" />

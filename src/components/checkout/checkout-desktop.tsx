@@ -331,20 +331,9 @@ export function CheckoutDesktop({ user, cart, pending, notice, onSubmit }: Check
             {(field) => (
               <Field id="ens-name" label="Nome ENS" required error={fieldError(field.state.meta.errors)}>
                 <div className="flex gap-2">
-                  <input
-                    ref={bind('ensName')}
-                    id="ens-name"
-                    value={field.state.value}
-                    onBlur={field.handleBlur}
-                    onChange={(event) => field.handleChange(event.target.value)}
-                    autoComplete="off"
-                    spellCheck={false}
-                    aria-invalid={Boolean(fieldError(field.state.meta.errors)) || undefined}
-                    className={cn(controlClass, 'max-w-[78px]')}
-                  />
                   <form.Field name="ensSuffix">
                     {(suffix) => (
-                      <div className="relative w-[78px]">
+                      <div className="relative w-[78px] shrink-0">
                         <select
                           ref={bind('ensSuffix')}
                           aria-label="Sufixo do nome ENS"
@@ -363,6 +352,17 @@ export function CheckoutDesktop({ user, cart, pending, notice, onSubmit }: Check
                       </div>
                     )}
                   </form.Field>
+                  <input
+                    ref={bind('ensName')}
+                    id="ens-name"
+                    value={field.state.value}
+                    onBlur={field.handleBlur}
+                    onChange={(event) => field.handleChange(event.target.value)}
+                    autoComplete="off"
+                    spellCheck={false}
+                    aria-invalid={Boolean(fieldError(field.state.meta.errors)) || undefined}
+                    className={cn(controlClass, 'min-w-0 flex-1')}
+                  />
                 </div>
               </Field>
             )}
