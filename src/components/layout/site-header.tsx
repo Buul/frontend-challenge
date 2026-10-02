@@ -60,7 +60,16 @@ function HeaderSearch() {
       <button
         ref={toggle}
         type={open ? 'submit' : 'button'}
-        onClick={open ? undefined : () => setOpen(true)}
+        // React re-renders this button as `submit` within the same click, so the opening click must not submit
+        // the (still empty) search, which would navigate away from the current page.
+        onClick={
+          open
+            ? undefined
+            : (event) => {
+                event.preventDefault()
+                setOpen(true)
+              }
+        }
         aria-label={open ? 'Enviar busca' : 'Abrir busca'}
         className="rounded-sm hover:opacity-80"
       >
@@ -87,12 +96,17 @@ export function SiteHeader({ active = 'home', bordered = true }: SiteHeaderProps
   return (
     <header className={bordered ? 'hairline-b' : undefined}>
       <SkipLink />
-      <div className="flex items-center justify-between gap-4">
-        <Link to="/" className="w-40 shrink-0 py-2 text-sm font-bold tracking-[1.4px]" aria-label="Kurio, página inicial">
+      {/* The fixed logo width centers the nav on desktop; on tablets every pixel goes to the nav. While the search
+          is open below 1024 px it takes the nav's place, so nothing is clipped. */}
+      <div className="group/header flex items-center justify-between gap-4">
+        <Link to="/" className="shrink-0 py-2 text-sm font-bold tracking-[1.4px] lg:w-40" aria-label="Kurio, página inicial">
           KURIO
         </Link>
 
-        <nav aria-label="Principal" className="flex min-w-0 flex-1 items-center justify-center gap-6 overflow-x-auto xl:gap-10">
+        <nav
+          aria-label="Principal"
+          className="flex min-w-0 flex-1 items-center justify-center gap-5 overflow-x-auto lg:gap-6 xl:gap-10 max-lg:group-has-[#site-search]/header:hidden"
+        >
           {NAV_ITEMS.map(({ id, label, hash: itemHash }) => (
             <Link
               key={id}
@@ -106,7 +120,7 @@ export function SiteHeader({ active = 'home', bordered = true }: SiteHeaderProps
           ))}
         </nav>
 
-        <div className="flex shrink-0 items-center gap-4 xl:gap-7">
+        <div className="flex shrink-0 items-center gap-4 max-lg:group-has-[#site-search]/header:ml-auto xl:gap-7">
           <HeaderSearch />
           <Link to="/cart" aria-label={cartLabel(cartCount)} className="relative rounded-sm hover:opacity-80">
             <img src={cartIcon} alt="" width={24} height={24} />
