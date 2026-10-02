@@ -9,6 +9,8 @@ test('salvar a carteira principal', async ({ page }) => {
   await page.getByRole('menuitem', { name: 'Meu perfil' }).click()
   await expect(page).toHaveURL(/\/profile$/)
 
+  // `isVisible()` does not wait: let the profile render before choosing how to reach "Carteiras".
+  await expect(page.getByRole('heading', { name: 'Perfil do colecionador' })).toBeVisible()
   const wallets = page.getByRole('link', { name: 'Carteiras' })
   if (!(await wallets.isVisible())) {
     await page.getByRole('button', { name: /Meu perfil/ }).click()
@@ -33,4 +35,20 @@ test('salvar a carteira principal', async ({ page }) => {
   await expect(page.getByLabel('Endereço da carteira')).toHaveValue(ADDRESS)
   await expect(page.getByLabel('Apelido da carteira')).toHaveValue('Principal')
   await expect(page.getByText('Você ainda não adicionou uma carteira secundária.')).toBeVisible()
+})
+
+test('carteira com dados inválidos mostra os erros e não é salva', async ({ page }) => {
+  await signInAt(page, '/wallets', USERS.ana)
+  await expect(page.getByRole('heading', { name: 'Carteira principal' })).toBeVisible()
+
+  await page.getByLabel('Endereço da carteira').fill('nao-e-um-endereco')
+  await page.getByRole('button', { name: 'Salvar carteira' }).click()
+
+  const displayName = page.getByLabel('Nome de exibição')
+  await expect(displayName).toBeFocused()
+  await expect(displayName).toHaveAttribute('aria-invalid', 'true')
+  await expect(page.getByText('Informe um endereço 0x ou um nome ENS, como nome.eth.')).toBeVisible()
+
+  await page.reload()
+  await expect(page.getByLabel('Endereço da carteira')).toHaveValue('')
 })
