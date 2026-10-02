@@ -128,7 +128,7 @@ export const checkoutSchema = z.object({
   notes: z.string().trim().max(280, 'Use até 280 caracteres na observação.'),
 })
 
-/** Body of `PUT /auth/wallets` when saving the primary or secondary wallet. */
+/** Body of `POST`/`PUT /auth/wallets/:slot`: the primary or secondary wallet. */
 export const walletSchema = z.object({
   displayName,
   walletNickname,

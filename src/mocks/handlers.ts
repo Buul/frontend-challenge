@@ -26,7 +26,8 @@ import {
   type AvatarUpdateRequest,
   type CollectorProfile,
   type CollectorWallets,
-  type WalletUpdateRequest,
+  type CollectorWallet,
+  type WalletSettingsRequest,
 } from '@/lib/api/types'
 import type { ApiErrorBody } from '@/lib/api/errors'
 import { compareEth, isEthAmount } from '@/lib/eth'
@@ -449,37 +450,44 @@ export const handlers: RequestHandler[] = [
     return HttpResponse.json<CollectorWallets>(readWallets(session.user.id))
   }),
 
-  http.put<never, WalletUpdateRequest, CollectorWallets | ApiErrorBody>(`${API}/auth/wallets`, async ({ request }) => {
-    await delay(400)
+  // Creates (`POST`) or replaces (`PUT`) the primary or the secondary wallet.
+  ...(['post', 'put'] as const).map((method) =>
+    http[method]<{ slot: string }, CollectorWallet, CollectorWallets | ApiErrorBody>(`${API}/auth/wallets/:slot`, async ({ params, request }) => {
+      await delay(400)
+      if (isScenarioActive('wallets-error')) return serviceUnavailable()
+      const session = authenticate(request)
+      if (!session) return unauthenticated()
+      const slot = params.slot
+      if (slot !== 'primary' && slot !== 'secondary') return notFound('Carteira não encontrada.')
+
+      const parsed = walletSchema.safeParse(await request.json().catch(() => null))
+      if (!parsed.success) return validationError(toFieldErrors(parsed.error), 'Verifique os dados informados.')
+      const wallet = toCollectorWallet(parsed.data)
+      if (!wallet) return validationError({ walletType: 'Selecione uma carteira.' }, 'Verifique os dados informados.')
+
+      const exists = readWallets(session.user.id)[slot] !== null
+      if (method === 'post' && exists) return conflict('Esta carteira já existe. Atualize-a em vez de criar outra.')
+      if (method === 'put' && !exists) return notFound('Esta carteira ainda não existe. Crie-a primeiro.')
+      return HttpResponse.json<CollectorWallets>(saveWallet(session.user.id, slot, wallet), { status: method === 'post' ? 201 : 200 })
+    }),
+  ),
+
+  // The secondary wallet can mirror the primary instead of being its own.
+  http.patch<never, Partial<WalletSettingsRequest>, CollectorWallets | ApiErrorBody>(`${API}/auth/wallets`, async ({ request }) => {
+    await delay(300)
     if (isScenarioActive('wallets-error')) return serviceUnavailable()
     const session = authenticate(request)
     if (!session) return unauthenticated()
-
     const body: unknown = await request.json().catch(() => null)
-    if (!isRecord(body)) return validationError({ action: 'Informe a ação.' }, 'Verifique os dados informados.')
-
-    if (body.action === 'mirror') {
-      if (typeof body.mirrorPrimary !== 'boolean') {
-        return validationError({ mirrorPrimary: 'Informe se a carteira secundária repete a principal.' }, 'Verifique os dados informados.')
-      }
-      const result = setWalletMirror(session.user.id, body.mirrorPrimary)
-      if (result === 'missing-primary') {
-        const message = 'Salve a carteira principal antes de copiá-la.'
-        return validationError({ mirrorPrimary: message }, message)
-      }
-      return HttpResponse.json<CollectorWallets>(result)
+    if (!isRecord(body) || typeof body.mirrorPrimary !== 'boolean') {
+      return validationError({ mirrorPrimary: 'Informe se a carteira secundária repete a principal.' }, 'Verifique os dados informados.')
     }
-
-    if (body.action !== 'save' || (body.slot !== 'primary' && body.slot !== 'secondary')) {
-      return validationError({ action: 'Informe a carteira a salvar.' }, 'Verifique os dados informados.')
+    const result = setWalletMirror(session.user.id, body.mirrorPrimary)
+    if (result === 'missing-primary') {
+      const message = 'Salve a carteira principal antes de copiá-la.'
+      return validationError({ mirrorPrimary: message }, message)
     }
-
-    const parsed = walletSchema.safeParse(body.wallet)
-    if (!parsed.success) return validationError(toFieldErrors(parsed.error), 'Verifique os dados informados.')
-    const wallet = toCollectorWallet(parsed.data)
-    if (!wallet) return validationError({ walletType: 'Selecione uma carteira.' }, 'Verifique os dados informados.')
-
-    return HttpResponse.json<CollectorWallets>(saveWallet(session.user.id, body.slot, wallet))
+    return HttpResponse.json<CollectorWallets>(result)
   }),
 
   http.post(`${API}/newsletter`, async ({ request }) => {

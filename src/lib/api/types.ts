@@ -263,9 +263,13 @@ export type CollectorWallets = {
   mirrorPrimary: boolean
 }
 
-export type WalletUpdateRequest =
-  | { action: 'save'; slot: 'primary' | 'secondary'; wallet: CollectorWallet }
-  | { action: 'mirror'; mirrorPrimary: boolean }
+export type WalletSlot = 'primary' | 'secondary'
+
+/** Body of `PATCH /auth/wallets`. */
+export type WalletSettingsRequest = { mirrorPrimary: boolean }
+
+/** What the wallets screen asks for; `useUpdateWallets` maps it to `POST`/`PUT /auth/wallets/:slot` or `PATCH /auth/wallets`. */
+export type WalletCommand = { action: 'save'; slot: WalletSlot; wallet: CollectorWallet } | ({ action: 'mirror' } & WalletSettingsRequest)
 
 export type LoginRequest = {
   email: string

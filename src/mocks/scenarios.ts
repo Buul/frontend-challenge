@@ -18,7 +18,7 @@ export type MockScenario =
   | 'checkout-error'
   /** `PATCH /auth/profile` answers 503. */
   | 'profile-error'
-  /** `PUT /auth/wallets` answers 503. */
+  /** Creating, updating or mirroring a wallet answers 503. */
   | 'wallets-error'
   /** `POST /orders` creates the order but answers only after 60 s, past the client's timeout; the client retries with the same key. */
   | 'checkout-timeout'
