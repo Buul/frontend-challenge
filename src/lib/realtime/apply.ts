@@ -111,7 +111,11 @@ export function applyOrderUpdated(queryClient: QueryClient, event: OrderUpdatedE
   // The receipt dialog speaks for itself; elsewhere a toast tells the outcome.
   if (watched) return undefined
   if (order.status === 'confirmed') return `Pedido ${order.id} confirmado.`
-  if (order.status === 'refused') return `Pagamento do pedido ${order.id} recusado. Os NFTs voltaram ao carrinho.`
+  if (order.status === 'refused') {
+    return order.failureCode === 'disconnected'
+      ? `A carteira se desconectou e o pedido ${order.id} não foi pago. Os NFTs voltaram ao carrinho.`
+      : `Pagamento do pedido ${order.id} recusado. Os NFTs voltaram ao carrinho.`
+  }
   return undefined
 }
 

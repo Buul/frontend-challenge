@@ -56,10 +56,11 @@ function CheckoutPage() {
   const onBack = () => (canGoBack ? router.history.back() : void router.navigate({ to: '/cart' }))
   const closeOrder = () => void navigate({ search: (prev) => ({ ...prev, order: undefined }), replace: true })
 
-  // An order id that is not this user's (or no longer exists) is dropped from the URL.
+  // An order id that no longer exists, or belongs to another account, is dropped from the URL.
   useEffect(() => {
-    if (order.error instanceof ApiError && order.error.code === 'NOT_FOUND') {
-      setNotice('Pedido não encontrado.')
+    if (!(order.error instanceof ApiError)) return
+    if (order.error.code === 'NOT_FOUND' || order.error.code === 'FORBIDDEN') {
+      setNotice(order.error.code === 'FORBIDDEN' ? 'Este pedido pertence a outra conta.' : 'Pedido não encontrado.')
       closeOrder()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- reacts to a new error only
@@ -128,6 +129,11 @@ function CheckoutPage() {
 
   const empty = (
     <div className="flex flex-col items-start gap-4 py-8">
+      {notice && (
+        <p role="alert" className="text-[13px] leading-4 text-coral">
+          {notice}
+        </p>
+      )}
       <p className="text-sm text-muted-foreground">
         {confirmed ? 'Pedido confirmado. Seu carrinho está vazio.' : 'Seu carrinho está vazio. Explore o mercado para adicionar NFTs.'}
       </p>

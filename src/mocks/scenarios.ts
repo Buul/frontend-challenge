@@ -20,10 +20,12 @@ export type MockScenario =
   | 'profile-error'
   /** `PUT /auth/wallets` answers 503. */
   | 'wallets-error'
-  /** `POST /orders` creates the order but the first response is lost (network error); the client retries with the same key. */
+  /** `POST /orders` creates the order but answers only after 60 s, past the client's timeout; the client retries with the same key. */
   | 'checkout-timeout'
   /** The wallet refuses the payment: orders settle as `refused` and the items go back to the cart. */
   | 'payment-refused'
+  /** The wallet disconnects before signing: orders settle as `refused` (`failureCode: 'disconnected'`), items go back. */
+  | 'wallet-disconnected'
   /** The realtime server refuses connections; clients keep retrying until the scenario is lifted. */
   | 'realtime-offline'
   /** Every NFT event is delivered twice, exercising duplicate tolerance on the client. */

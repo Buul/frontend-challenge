@@ -2,13 +2,12 @@ import closeIcon from '@/assets/figma/auth-close.svg'
 import thankYou from '@/assets/figma/thank-you.svg'
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog'
 import { useIsMobile } from '@/hooks/use-media-query'
-import type { Order, OrderLine } from '@/lib/api/types'
+import { EXPLORERS, type Order, type OrderLine } from '@/lib/api/types'
 import { formatEth, formatReceiptDate } from '@/lib/format'
 import { cn } from '@/lib/utils'
 
 const shortTx = (txId: string) => `${txId.slice(0, 6)}…${txId.slice(-4)}`
 
-const etherscanHref = (txId: string) => `https://etherscan.io/tx/${txId}`
 
 type ConfirmedOrder = Order & { txId: string }
 
@@ -36,7 +35,7 @@ export function OrderDialog({ order, onClose }: { order?: Order; onClose: () => 
       >
         {order && (
           <p role="status" className="sr-only">
-            {STATUS_ANNOUNCEMENTS[order.status]}
+            {order.failureCode === 'disconnected' ? 'Carteira desconectada.' : STATUS_ANNOUNCEMENTS[order.status]}
           </p>
         )}
         {order &&
@@ -147,7 +146,9 @@ function OrderProgress({ order, onClose }: { order: Order; onClose: () => void }
             !
           </span>
         )}
-        <DialogTitle className="text-lg leading-6 font-bold">{pending ? 'Confirmando o pagamento' : 'Pagamento recusado'}</DialogTitle>
+        <DialogTitle className="text-lg leading-6 font-bold">
+          {pending ? 'Confirmando o pagamento' : order.failureCode === 'disconnected' ? 'Carteira desconectada' : 'Pagamento recusado'}
+        </DialogTitle>
         <DialogDescription className="max-w-[380px] text-sm leading-[22px] text-muted-foreground">
           {pending
             ? `Confirme a transação de ${formatEth(order.total)} na ${order.walletName}. O recibo aparece aqui assim que a ${order.networkLabel} responder.`
@@ -261,7 +262,7 @@ function Note({ order, buttonClassName }: { order: ConfirmedOrder; buttonClassNa
         Transação confirmada na {order.networkLabel}. A propriedade foi transferida para sua carteira conectada e registrada na rede.
       </p>
       <a
-        href={etherscanHref(order.txId)}
+        href={EXPLORERS[order.network].txUrl(order.txId)}
         target="_blank"
         rel="noreferrer"
         className={cn(
@@ -269,7 +270,7 @@ function Note({ order, buttonClassName }: { order: ConfirmedOrder; buttonClassNa
           buttonClassName ?? 'rounded-[5px]',
         )}
       >
-        Ver no Etherscan
+        Ver no {EXPLORERS[order.network].name}
       </a>
     </div>
   )

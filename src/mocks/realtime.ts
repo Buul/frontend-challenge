@@ -84,7 +84,11 @@ function scheduleSettlement(id: string, settleAt: number) {
 }
 
 export function placeOrder(entry: { userId: string; order: Order; lines: Parameters<typeof ordersStore.create>[0]['lines']; promoCode?: string }) {
-  const outcome: OrderOutcome = isScenarioActive('payment-refused') ? 'refused' : 'confirmed'
+  const outcome: OrderOutcome = isScenarioActive('payment-refused')
+    ? 'refused'
+    : isScenarioActive('wallet-disconnected')
+      ? 'disconnected'
+      : 'confirmed'
   const settleAt = Date.now() + orderSettleDelay()
   ordersStore.create({ ...entry, outcome, settleAt })
   scheduleSettlement(entry.order.id, settleAt)

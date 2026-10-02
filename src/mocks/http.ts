@@ -12,6 +12,8 @@ export const conflict = (message: string, fieldErrors?: Record<string, string>) 
 
 export const notFound = (message: string) => apiError(404, 'NOT_FOUND', message)
 
+export const forbidden = (message: string) => apiError(403, 'FORBIDDEN', message)
+
 export const serviceUnavailable = (message = 'Serviço indisponível no momento. Tente novamente.') =>
   apiError(503, 'SERVICE_UNAVAILABLE', message)
 

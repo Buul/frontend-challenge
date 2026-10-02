@@ -41,13 +41,15 @@ import './market-store'
 import { idempotencyKeys, ordersStore } from './orders-store'
 import { placeOrder, settleDueOrders } from './realtime'
 import { favoritesStore } from './favorites-store'
-import { conflict, notFound, serviceUnavailable, unauthenticated, validationError } from './http'
+import { conflict, forbidden, notFound, serviceUnavailable, unauthenticated, validationError } from './http'
 import { extraLatency, isScenarioActive } from './scenarios'
 import { isRecord } from './storage'
 import { readWallets, saveWallet, setWalletMirror, toCollectorWallet } from './wallets-store'
 
 const API = import.meta.env.VITE_API_URL ?? '/api'
 const PAGE_SIZE = 9
+/** How long `POST /orders` takes to answer under `checkout-timeout`: well past the client's 10 s timeout. */
+const CHECKOUT_TIMEOUT_DELAY_MS = 60_000
 
 const countBy = <K extends string>(ids: readonly { id: K }[], key: (nft: (typeof nfts)[number]) => K) =>
   Object.fromEntries(ids.map(({ id }) => [id, nfts.filter((nft) => key(nft) === id).length])) as Record<K, number>
@@ -353,8 +355,8 @@ export const handlers: RequestHandler[] = [
       if (previous.userId !== session.user.id || previous.fingerprint !== fingerprint) {
         return conflict('Esta tentativa de compra já foi usada com outros dados. Confirme a compra novamente.')
       }
-      const order = ordersStore.get(session.user.id, previous.orderId)
-      return order ? HttpResponse.json<Order>(order) : notFound('Pedido não encontrado.')
+      const found = ordersStore.get(session.user.id, previous.orderId)
+      return 'order' in found ? HttpResponse.json<Order>(found.order) : notFound('Pedido não encontrado.')
     }
 
     // The client sends the total it showed; if prices or supply moved since, the collector must review it first.
@@ -379,6 +381,7 @@ export const handlers: RequestHandler[] = [
       updatedAt: now,
       walletLabel: parsed.data.walletAddress.includes('.') ? parsed.data.walletAddress : shortenAddress(parsed.data.walletAddress),
       walletName: wallet?.label ?? 'Carteira',
+      network: network?.id ?? 'ethereum',
       networkLabel: network?.label ?? 'Ethereum',
       items: cart.items.map(({ name, image, tokenId, editionLabel, quantity, lineTotal }) => ({
         name,
@@ -401,8 +404,8 @@ export const handlers: RequestHandler[] = [
     })
 
     idempotencyKeys.save(key, { userId: session.user.id, fingerprint, orderId: order.id })
-    // The order exists, but the client never hears about it: only a retry with the same key can recover it.
-    if (isScenarioActive('checkout-timeout')) return HttpResponse.error()
+    // The order exists, but the answer outlives the client's 10 s timeout: only a retry with the same key recovers it.
+    if (isScenarioActive('checkout-timeout')) await delay(CHECKOUT_TIMEOUT_DELAY_MS)
 
     // 202: the wallet answer arrives later through `order.updated` (or `GET /orders/:id`).
     return HttpResponse.json<Order>(order, { status: 202 })
@@ -413,8 +416,9 @@ export const handlers: RequestHandler[] = [
     const session = authenticate(request)
     if (!session) return unauthenticated()
     settleDueOrders()
-    const order = ordersStore.get(session.user.id, params.id)
-    return order ? HttpResponse.json<Order>(order) : notFound('Pedido não encontrado.')
+    const found = ordersStore.get(session.user.id, params.id)
+    if ('order' in found) return HttpResponse.json<Order>(found.order)
+    return found.error === 'forbidden' ? forbidden('Este pedido pertence a outra conta.') : notFound('Pedido não encontrado.')
   }),
 
   http.get<never, never, FavoriteList | ApiErrorBody>(`${API}/favorites`, async ({ request }) => {

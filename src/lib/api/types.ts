@@ -18,6 +18,13 @@ export const NETWORKS = [
   { id: 'solana', label: 'Solana' },
 ] as const
 
+/** Block explorer of each network, used to link a confirmed transaction. */
+export const EXPLORERS = {
+  ethereum: { name: 'Etherscan', txUrl: (txId: string) => `https://etherscan.io/tx/${txId}` },
+  polygon: { name: 'Polygonscan', txUrl: (txId: string) => `https://polygonscan.com/tx/${txId}` },
+  solana: { name: 'Solscan', txUrl: (txId: string) => `https://solscan.io/tx/${txId}` },
+} as const satisfies Record<(typeof NETWORKS)[number]['id'], { name: string; txUrl: (txId: string) => string }>
+
 export const NFT_TABS = [
   { id: 'all', label: 'Todos os NFTs' },
   { id: 'new', label: 'Novos lançamentos' },
@@ -186,11 +193,14 @@ export type Order = {
   /** Monotonic; realtime events carrying an older version must be ignored. */
   version: number
   txId?: string
+  /** Why a `refused` order failed: the wallet rejected it, or it disconnected before signing. */
+  failureCode?: 'rejected' | 'disconnected'
   failureReason?: string
   createdAt: string
   updatedAt: string
   walletLabel: string
   walletName: string
+  network: NetworkId
   networkLabel: string
   items: OrderLine[]
   subtotal: EthAmount

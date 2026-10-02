@@ -1,7 +1,7 @@
 import type { CartItemInput, Order } from '@/lib/api/types'
 import { isRecord, persisted } from './storage'
 
-export type OrderOutcome = 'confirmed' | 'refused'
+export type OrderOutcome = 'confirmed' | 'refused' | 'disconnected'
 
 type StoredOrder = {
   userId: string
@@ -19,7 +19,7 @@ const isStoredOrder = (value: unknown): value is StoredOrder =>
   typeof value.userId === 'string' &&
   isRecord(value.order) &&
   Array.isArray(value.lines) &&
-  (value.outcome === 'confirmed' || value.outcome === 'refused') &&
+  (value.outcome === 'confirmed' || value.outcome === 'refused' || value.outcome === 'disconnected') &&
   typeof value.settleAt === 'number'
 
 const store = persisted<Record<string, StoredOrder>>(
@@ -28,6 +28,11 @@ const store = persisted<Record<string, StoredOrder>>(
   (value) => isRecord(value) && Object.values(value).every(isStoredOrder),
 )
 
+const FAILURE_REASONS = {
+  refused: 'A carteira recusou a transação. Nenhum valor foi cobrado e seus NFTs voltaram ao carrinho.',
+  disconnected: 'A carteira se desconectou antes de assinar a transação. Nenhum valor foi cobrado e seus NFTs voltaram ao carrinho.',
+} as const
+
 const transactionId = () => `0x${Array.from(crypto.getRandomValues(new Uint8Array(32)), (byte) => byte.toString(16).padStart(2, '0')).join('')}`
 
 export const ordersStore = {
@@ -35,10 +40,11 @@ export const ordersStore = {
     store.write({ ...store.read(), [entry.order.id]: entry })
   },
 
-  /** Only the owner sees an order; for anyone else it does not exist. */
-  get(userId: string, id: string) {
+  /** The order, if `userId` owns it; `forbidden` when it exists but belongs to someone else. */
+  get(userId: string, id: string): { order: Order } | { error: 'not-found' | 'forbidden' } {
     const entry = store.read()[id]
-    return entry?.userId === userId ? entry.order : undefined
+    if (!entry) return { error: 'not-found' }
+    return entry.userId === userId ? { order: entry.order } : { error: 'forbidden' }
   },
 
   /** Ids of pending orders whose answer is due by `now`. */
@@ -68,7 +74,8 @@ export const ordersStore = {
             status: 'refused',
             version: entry.order.version + 1,
             updatedAt,
-            failureReason: 'A carteira recusou a transação. Nenhum valor foi cobrado e seus NFTs voltaram ao carrinho.',
+            failureCode: entry.outcome === 'disconnected' ? 'disconnected' : 'rejected',
+            failureReason: FAILURE_REASONS[entry.outcome],
           }
     const settled = { ...entry, order }
     store.write({ ...entries, [id]: settled })
