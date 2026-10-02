@@ -17,12 +17,20 @@ export default defineConfig({
     baseURL,
     locale: 'pt-BR',
     timezoneId: 'America/Sao_Paulo',
-    trace: 'on-first-retry',
+    // Every failure keeps its trace (open it with `pnpm exec playwright show-trace` or from the HTML report).
+    trace: 'retain-on-failure',
     screenshot: 'only-on-failure',
   },
+  // The challenge's breakpoints: desktop 1440, tablet 768, mobile 390. Every flow runs on desktop and mobile;
+  // the tablet runs the layout-sensitive specs (visual regression, accessibility, catalog, detail).
   projects: [
-    { name: 'desktop', use: { ...devices['Desktop Chrome'] } },
-    { name: 'mobile', use: { ...devices['Pixel 7'] } },
+    { name: 'desktop', use: { ...devices['Desktop Chrome'], viewport: { width: 1440, height: 900 } } },
+    {
+      name: 'tablet',
+      use: { ...devices['Desktop Chrome'], viewport: { width: 768, height: 1024 } },
+      testMatch: ['visual.spec.ts', 'a11y.spec.ts', 'catalog.spec.ts', 'nft-detail.spec.ts', 'smoke.spec.ts'],
+    },
+    { name: 'mobile', use: { ...devices['Pixel 7'], viewport: { width: 390, height: 844 } } },
   ],
   webServer: {
     command: 'pnpm build && pnpm preview',

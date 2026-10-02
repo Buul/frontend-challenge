@@ -38,7 +38,7 @@ test('campos obrigatórios vazios mostram o erro no campo e levam o foco até el
   const displayName = page.getByLabel('Nome de exibição')
   await expect(displayName).toBeFocused()
   await expect(displayName).toHaveAttribute('aria-invalid', 'true')
-  await expect(page.getByText('Informe o nome de exibição.')).toBeVisible()
+  await expect(displayName).toHaveAccessibleDescription('Informe o nome de exibição.')
 })
 
 test('troca de senha: senha atual errada é recusada; a certa troca e vale no próximo login', async ({ page }) => {

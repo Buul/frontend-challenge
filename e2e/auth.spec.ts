@@ -86,6 +86,18 @@ test('sessão expirada pede novo login e retoma a ação no mesmo lugar', async 
   await expect(favorite).toHaveAttribute('aria-pressed', 'true')
 })
 
+test('com o relógio adiantado além dos 30 min, a sessão expira sozinha e o login reabre', async ({ page }) => {
+  // The client's expiry timer and the mock server's session check both follow the controlled clock.
+  await page.clock.install()
+  await signInAt(page, '/nfts/nft-2', USERS.ana)
+  expect(await page.evaluate(() => localStorage.getItem('kurio:session-token'))).not.toBeNull()
+
+  await page.clock.fastForward('31:00')
+  await expect(page.getByRole('dialog')).toContainText('Sua sessão expirou')
+  await expect(page).toHaveURL(/\/nfts\/nft-2/)
+  expect(await page.evaluate(() => localStorage.getItem('kurio:session-token'))).toBeNull()
+})
+
 test('link direto abre o login e redireciona só para caminhos internos', async ({ page }) => {
   await page.goto('/?auth=login&redirect=%2Fnfts%2Fnft-3')
   await signIn(page, USERS.bruno)

@@ -41,3 +41,30 @@ test('cards da home levam ao detalhe', async ({ page }) => {
   await card.click()
   await expect(page.getByRole('heading', { level: 1, name: name! })).toBeVisible()
 })
+
+test('galeria, ampliação, abas e links de compartilhamento do detalhe', async ({ page, isMobile }) => {
+  await page.goto('/nfts/nft-1')
+  await expect(page.getByRole('heading', { level: 1, name: 'Emerald Ape #042' })).toBeVisible()
+
+  if (isMobile) {
+    await page.getByRole('button', { name: 'Imagem 2 de 4' }).click()
+    await expect(page.getByRole('button', { name: 'Imagem 2 de 4' })).toHaveAttribute('aria-current', 'true')
+  } else {
+    await page.getByRole('button', { name: 'Mostrar imagem 2 de 4' }).click()
+    await expect(page.getByRole('button', { name: 'Mostrar imagem 2 de 4' })).toHaveAttribute('aria-pressed', 'true')
+
+    await page.getByRole('button', { name: 'Ampliar imagem' }).click()
+    const zoom = page.getByRole('dialog', { name: 'Emerald Ape #042' })
+    await expect(zoom).toBeVisible()
+    await page.keyboard.press('Escape')
+    await expect(zoom).toBeHidden()
+
+    const share = page.getByRole('link', { name: 'Compartilhar no X/Twitter (abre em nova aba)' })
+    await expect(share).toHaveAttribute('href', /twitter\.com\/intent\/tweet\?.*nfts%2Fnft-1/)
+    await expect(share).toHaveAttribute('target', '_blank')
+  }
+
+  await page.getByRole('tab', { name: /Avaliações/ }).click()
+  await expect(page.getByRole('tab', { name: /Avaliações/ })).toHaveAttribute('aria-selected', 'true')
+  await expect(page.getByRole('tabpanel', { name: /Avaliações/ })).toContainText('Lia Costa')
+})

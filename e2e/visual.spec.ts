@@ -1,5 +1,6 @@
 import { expect, test, type Page } from '@playwright/test'
 import { signInAt, USERS } from './auth-helpers.ts'
+import { buyButton as buy } from './flows.ts'
 
 /**
  * Visual regression of the four screens the challenge names, on the default mock data (each test starts from a
@@ -21,8 +22,6 @@ async function settle(page: Page) {
   // No skeleton may be left on screen.
   await expect(page.locator('[data-slot=skeleton]')).toHaveCount(0)
 }
-
-const buy = (page: Page) => page.getByRole('button', { name: /^(COMPRAR|Comprar NFT)$/ })
 
 test('home', async ({ page }) => {
   await page.goto('/')

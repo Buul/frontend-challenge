@@ -1,28 +1,11 @@
-import { expect, test, type Page, type TestInfo } from '@playwright/test'
-import { accountButton, signInAt, USERS } from './auth-helpers.ts'
+import { expect, test, type Page } from '@playwright/test'
+import { signInAt, signOut, USERS } from './auth-helpers.ts'
+import { buyButton as buy, confirmButton, readyToConfirm, receiptHeading as receipt, statusMessage as toast } from './flows.ts'
 import { mockStorage, realtime } from './mock-helpers.ts'
 
-const buy = (page: Page) => page.getByRole('button', { name: /^(COMPRAR|Comprar NFT)$/ })
-const toast = (page: Page, text: string | RegExp) => page.getByRole('status').filter({ hasText: text })
-
-const WALLET = '0xA91F4c8e2b1d6a7035f0c91b7e4d2a18c6b1E82C'
-
-/** Signs in, puts Emerald Ape #042 (open edition, 1.19 ETH) in the cart and opens the payment, ready to confirm. */
-async function openCheckout(page: Page, testInfo: TestInfo) {
-  await signInAt(page, '/nfts/nft-1?edition=open', USERS.ana)
-  await buy(page).click()
-  await expect(page).toHaveURL(/\/cart$/)
-  await page.getByRole('button', { name: 'Finalizar', exact: true }).click()
-  await expect(page).toHaveURL(/\/checkout$/)
-  if (testInfo.project.name === 'desktop') {
-    await page.getByLabel('Nome de usuário').fill('anasouza')
-    await page.getByRole('combobox', { name: 'Rede', exact: true }).selectOption('polygon')
-    await page.getByLabel('Nome do perfil').fill('Ana')
-    await page.getByLabel('Endereço da carteira').fill(WALLET)
-    await page.getByLabel('Código de indicação').fill('AMIGO')
-    await page.getByRole('textbox', { name: 'Nome ENS', exact: true }).fill('ana')
-    await page.getByLabel('Tipo de carteira').selectOption('metamask')
-  }
+/** Payment ready to confirm (see `readyToConfirm`), with the realtime connection up. */
+async function openCheckout(page: Page) {
+  await readyToConfirm(page)
   await realtime(page).connected()
 }
 
@@ -34,8 +17,7 @@ async function openDetail(page: Page, path: string) {
   await realtime(page).connected()
 }
 
-const confirm = (page: Page) => page.getByRole('button', { name: 'Confirmar compra' }).click()
-const receipt = (page: Page) => page.getByRole('dialog').getByRole('heading', { name: 'Seus NFTs agora estão na sua carteira' })
+const confirm = (page: Page) => confirmButton(page).click()
 
 test.describe('nft.updated', () => {
   test('preço e estoque mudam ao vivo no detalhe, com aviso acessível', async ({ page }) => {
@@ -92,6 +74,37 @@ test.describe('nft.updated', () => {
 })
 
 test.describe('conexão', () => {
+  test('com o servidor recusando conexões desde o início, o aviso aparece e some ao reconectar', async ({ page }) => {
+    await mockStorage(page, { 'kurio:mock-scenarios': 'realtime-offline' })
+    await page.goto('/nfts/nft-1')
+    await expect(page.getByRole('heading', { level: 1, name: 'Emerald Ape #042' })).toBeVisible()
+    await expect(toast(page, 'Atualizações em tempo real indisponíveis. Tentando reconectar…')).toBeVisible()
+
+    await realtime(page).setOnline(true)
+    await realtime(page).connected()
+    await expect(toast(page, 'Atualizações em tempo real indisponíveis')).toHaveCount(0)
+  })
+
+  test('com entrega duplicada de eventos, cada mudança é aplicada uma vez só', async ({ page }) => {
+    await mockStorage(page, { 'kurio:mock-scenarios': 'realtime-duplicates' })
+    await page.goto('/nfts/nft-1?edition=open')
+    await buy(page).click()
+    await expect(page).toHaveURL(/\/cart$/)
+    await expect(page.getByText('1.206 ETH').first()).toBeVisible()
+    await realtime(page).connected()
+
+    let cartReads = 0
+    page.on('request', (request) => {
+      if (request.method() === 'GET' && request.url().endsWith('/api/cart')) cartReads++
+    })
+    await realtime(page).updateNft('nft-1', { price: '1.47' })
+    await expect(page.getByText('1.486 ETH').first()).toBeVisible()
+    // A later event proves the duplicate was already delivered (and dropped) by the time we count.
+    await realtime(page).updateNft('nft-3', { price: '2.01' })
+    await page.waitForLoadState('networkidle')
+    expect(cartReads).toBe(1)
+  })
+
   test('ao reconectar, o que mudou offline vem pelo REST', async ({ page }) => {
     await openDetail(page, '/nfts/nft-1?edition=open')
 
@@ -109,8 +122,8 @@ test.describe('conexão', () => {
 })
 
 test.describe('checkout', () => {
-  test('preço que muda durante o pagamento é avisado e a compra sai pelo novo total', async ({ page }, testInfo) => {
-    await openCheckout(page, testInfo)
+  test('preço que muda durante o pagamento é avisado e a compra sai pelo novo total', async ({ page }) => {
+    await openCheckout(page)
 
     await realtime(page).updateNft('nft-1', { price: '1.47' })
     await expect(page.getByText('Os preços foram atualizados. O novo total é 1.486 ETH; revise antes de confirmar.')).toBeVisible()
@@ -120,8 +133,8 @@ test.describe('checkout', () => {
     await expect(page.getByRole('dialog').getByText('1.486 ETH').first()).toBeVisible()
   })
 
-  test('o servidor recusa um total desatualizado e a confirmação seguinte usa o total novo', async ({ page }, testInfo) => {
-    await openCheckout(page, testInfo)
+  test('o servidor recusa um total desatualizado e a confirmação seguinte usa o total novo', async ({ page }) => {
+    await openCheckout(page)
 
     // The event is lost: only the server knows the price moved.
     await realtime(page).updateNftSilently('nft-1', { price: '1.47' })
@@ -135,10 +148,10 @@ test.describe('checkout', () => {
 })
 
 test.describe('order.updated', () => {
-  test('pedido pendente sobrevive ao refresh e é confirmado pelo evento', async ({ page }, testInfo) => {
+  test('pedido pendente sobrevive ao refresh e é confirmado pelo evento', async ({ page }) => {
     // The simulated wallet takes long enough for the test to reload while the order is pending.
     await mockStorage(page, { 'kurio:mock:order-settle-ms': '600000' })
-    await openCheckout(page, testInfo)
+    await openCheckout(page)
 
     await confirm(page)
     const dialog = page.getByRole('dialog')
@@ -151,12 +164,25 @@ test.describe('order.updated', () => {
 
     await realtime(page).settleOrders()
     await expect(receipt(page)).toBeVisible()
-    await expect(dialog.getByRole('link', { name: 'Ver no Etherscan' })).toHaveAttribute('href', /https:\/\/etherscan\.io\/tx\/0x[a-f0-9]{64}/)
+    await expect(dialog.getByRole('link', { name: 'Ver no Polygonscan' })).toHaveAttribute('href', /https:\/\/polygonscan\.com\/tx\/0x[a-f0-9]{64}/)
   })
 
-  test('pagamento recusado é informado e os NFTs voltam ao carrinho', async ({ page }, testInfo) => {
+  test('carteira que desconecta antes de assinar é informada e os NFTs voltam ao carrinho', async ({ page }) => {
+    await mockStorage(page, { 'kurio:mock-scenarios': 'wallet-disconnected' })
+    await openCheckout(page)
+
+    await confirm(page)
+    const dialog = page.getByRole('dialog')
+    await expect(dialog.getByRole('heading', { name: 'Carteira desconectada' })).toBeVisible()
+    await expect(dialog.getByText('A carteira se desconectou antes de assinar', { exact: false })).toBeVisible()
+
+    await dialog.getByRole('button', { name: 'Revisar e tentar de novo' }).click()
+    await expect(page.getByText('1.206 ETH').first()).toBeVisible()
+  })
+
+  test('pagamento recusado é informado e os NFTs voltam ao carrinho', async ({ page }) => {
     await mockStorage(page, { 'kurio:mock-scenarios': 'payment-refused' })
-    await openCheckout(page, testInfo)
+    await openCheckout(page)
 
     await confirm(page)
     const dialog = page.getByRole('dialog')
@@ -170,17 +196,16 @@ test.describe('order.updated', () => {
     await expect(page.getByRole('button', { name: 'Confirmar compra' })).toBeEnabled()
   })
 
-  test('o desfecho do pedido de uma sessão encerrada não chega à sessão seguinte', async ({ page }, testInfo) => {
-    test.skip(testInfo.project.name === 'mobile', 'O fluxo de troca de conta é o mesmo; basta uma viewport.')
+  test('o desfecho do pedido de uma sessão encerrada não chega à sessão seguinte', async ({ page, isMobile }) => {
+    test.skip(isMobile, 'O fluxo de troca de conta é o mesmo; basta uma viewport.')
     await mockStorage(page, { 'kurio:mock:order-settle-ms': '600000' })
-    await openCheckout(page, testInfo)
+    await openCheckout(page)
     await confirm(page)
     await expect(page.getByRole('dialog').getByRole('heading', { name: 'Confirmando o pagamento' })).toBeVisible()
     const orderUrl = page.url()
 
     await page.goto('/')
-    await accountButton(page, USERS.ana).click()
-    await page.getByRole('menuitem', { name: 'Sair' }).click()
+    await signOut(page, USERS.ana)
     await signInAt(page, '/', USERS.bruno)
     await realtime(page).connected()
 
@@ -191,8 +216,9 @@ test.describe('order.updated', () => {
     await expect(card).toContainText('2.05 ETH')
     await expect(toast(page, /Pedido KR-/)).toHaveCount(0)
 
-    // Bruno cannot read Ana's order either: the id is dropped from the URL.
+    // Bruno cannot read Ana's order either: the API answers 403 and the id is dropped from the URL.
     await page.goto(orderUrl)
+    await expect(page.getByRole('alert').filter({ hasText: 'Este pedido pertence a outra conta.' })).toBeVisible()
     await expect(page).toHaveURL(/\/checkout$/)
     await expect(page.getByRole('dialog')).toHaveCount(0)
   })

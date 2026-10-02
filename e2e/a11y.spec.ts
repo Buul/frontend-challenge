@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test'
 import { signInAt, USERS } from './auth-helpers.ts'
+import { buyButton } from './flows.ts'
 
 test('o primeiro Tab mostra "Pular para o conteúdo", que leva o foco ao conteúdo', async ({ page }) => {
   await page.goto('/nfts/nft-1')
@@ -72,7 +73,7 @@ test('edição e compra funcionam só com o teclado', async ({ page }) => {
   await page.keyboard.press('Enter')
   await expect(page.getByRole('group', { name: 'Quantidade' }).locator('output')).toHaveText('2')
 
-  await page.getByRole('button', { name: /^(COMPRAR|Comprar NFT)$/ }).focus()
+  await buyButton(page).focus()
   await page.keyboard.press('Enter')
   await expect(page).toHaveURL(/\/cart$/)
 })

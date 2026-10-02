@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test'
+import { signIn, USERS } from './auth-helpers.ts'
 import { mockStorage } from './mock-helpers.ts'
 
 const cards = (page: Page) => page.locator('#mercado article')
@@ -115,4 +116,84 @@ test('falha ao carregar o catálogo é informada e "Tentar novamente" recupera',
   await alert.getByRole('button', { name: 'Tentar novamente' }).click()
   await expect(cards(page).first()).toBeVisible()
   await expect(alert).toHaveCount(0)
+})
+
+test.describe('cenários de rede', () => {
+  test.skip(({ isMobile }) => isMobile, 'Os filtros laterais ficam no layout desktop.')
+
+  test('com respostas fora de ordem, a tela mostra o resultado do último filtro escolhido', async ({ page }) => {
+    await mockStorage(page, { 'kurio:mock-scenarios': 'out-of-order' })
+    await page.goto('/')
+    await expect(cards(page).first()).toBeVisible({ timeout: 10_000 })
+
+    // Three filters in a row: their responses race back in random order.
+    const filters = page.getByRole('complementary', { name: 'Filtros' })
+    for (const name of [/^Arte digital/, /^Fotografia/, /^Música/]) await filters.getByRole('button', { name }).click()
+    await expect(page).toHaveURL(/collection=music/)
+
+    const expected = await page.evaluate(async () => {
+      const response = await fetch('/api/nfts?tab=all&sort=recent&page=1&collection=music')
+      return ((await response.json()) as { data: { name: string }[] }).data.map((nft) => nft.name)
+    })
+    await expect(summary(page)).toHaveText(`${expected.length} NFTs encontrados, página 1 de 1.`, { timeout: 10_000 })
+    await expect(page.locator('#mercado article h3')).toHaveText(expected)
+  })
+})
+
+test('sem rede, o catálogo informa o erro e volta quando a conexão retorna', async ({ page }) => {
+  await page.goto('/')
+  await page.evaluate(() => localStorage.setItem('kurio:mock-scenarios', 'network-offline'))
+  await page.reload()
+
+  const alert = page.getByRole('alert').filter({ hasText: 'Não foi possível carregar os NFTs.' })
+  await expect(alert).toBeVisible({ timeout: 15_000 })
+
+  await page.evaluate(() => localStorage.removeItem('kurio:mock-scenarios'))
+  await alert.getByRole('button', { name: 'Tentar novamente' }).click()
+  await expect(cards(page).first()).toBeVisible()
+})
+
+test('catálogo vazio mostra o estado vazio sem oferecer limpar filtros', async ({ page }) => {
+  await mockStorage(page, { 'kurio:mock-scenarios': 'catalog-empty' })
+  await page.goto('/')
+  await expect(page.getByText('Nenhum NFT encontrado com esses critérios.')).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Limpar filtros' })).toHaveCount(0)
+})
+
+test.describe('ações do card (desktop)', () => {
+  test.skip(({ isMobile }) => isMobile, 'No mobile o card só tem o coração; as ações de hover são do desktop.')
+
+  test('adicionar ao carrinho e favoritar direto do card', async ({ page }) => {
+    await page.goto('/')
+    const card = cards(page).filter({ hasText: 'Sage Nomad #009' })
+    await card.hover()
+    await card.getByRole('button', { name: 'Adicionar Sage Nomad #009 ao carrinho' }).click()
+    await expect(page.getByRole('status').filter({ hasText: 'Sage Nomad #009 (edição' })).toBeVisible()
+    await expect(page.getByRole('link', { name: 'Carrinho, 1 item' })).toBeVisible()
+
+    // A visitor is asked to sign in first; the favorite applies right after.
+    await card.getByRole('button', { name: 'Favoritar Sage Nomad #009' }).click()
+    const dialog = page.getByRole('dialog')
+    await expect(dialog).toBeVisible()
+    await signIn(page, USERS.ana)
+    await expect(card.getByRole('button', { name: 'Favoritar Sage Nomad #009' })).toHaveAttribute('aria-pressed', 'true')
+
+    await card.getByRole('link', { name: 'Ver detalhes de Sage Nomad #009' }).click()
+    await expect(page).toHaveURL(/\/nfts\/nft-2$/)
+  })
+
+  test('as ações aparecem com o foco do teclado, sem mouse', async ({ page }) => {
+    await page.goto('/')
+    const action = cards(page).first().getByRole('button', { name: /^Adicionar .* ao carrinho$/ })
+    await action.focus()
+    await expect(action).toBeVisible()
+    await expect.poll(() => action.evaluate((node) => getComputedStyle(node.parentElement!).opacity)).toBe('1')
+  })
+})
+
+test('a newsletter confirma a inscrição', async ({ page }) => {
+  await page.goto('/')
+  await page.getByLabel('Antecipe-se ao próximo lançamento').fill('colecionador@kurio.dev')
+  await page.getByRole('button', { name: 'Enviar' }).click()
+  await expect(page.getByText('Inscrição confirmada! Você vai receber as próximas novidades.')).toBeVisible()
 })

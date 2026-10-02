@@ -1,7 +1,6 @@
-import { expect, test, type Page } from '@playwright/test'
+import { expect, test } from '@playwright/test'
 import { signIn, signInAt, signOut, USERS } from './auth-helpers.ts'
-
-const buy = (page: Page) => page.getByRole('button', { name: /^(COMPRAR|Comprar NFT)$/ })
+import { buyButton as buy } from './flows.ts'
 
 test('comprar no detalhe adiciona ao carrinho e persiste após refresh', async ({ page }) => {
   await page.goto('/nfts/nft-1?edition=1-50')
