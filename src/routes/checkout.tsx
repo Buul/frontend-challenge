@@ -14,7 +14,7 @@ import { RetryAlert } from '@/components/ui/inline-alert'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useIsMobile } from '@/hooks/use-media-query'
 import { sessionKeys, useSession } from '@/lib/api/auth'
-import { cartKeys, cartQueryOptions } from '@/lib/api/cart'
+import { cartKeys, cartQueryOptions, fetchCartQuote } from '@/lib/api/cart'
 import { ApiError, getErrorMessage } from '@/lib/api/errors'
 import { createAttemptKeys, orderQueryOptions, usePlaceOrder, type CheckoutRequest } from '@/lib/api/orders'
 import type { SessionInfo, WalletId } from '@/lib/api/types'
@@ -22,6 +22,8 @@ import { compareEth } from '@/lib/eth'
 import { formatEth } from '@/lib/format'
 import { useAuthDialog } from '@/lib/auth/auth-dialog'
 import { sessionToken } from '@/lib/auth/session-token'
+
+const QUOTE_CHANGED = 'Os preços ou a disponibilidade mudaram. Revise o novo total antes de confirmar.'
 
 // Order ids look like `KR-1A2B3C4D`; anything else is ignored.
 const ORDER_ID = /^KR-[A-Z0-9]{8}$/
@@ -51,6 +53,7 @@ function CheckoutPage() {
   const { open: openLogin } = useAuthDialog()
   const [notice, setNotice] = useState<string>()
   const [attemptKeys] = useState(createAttemptKeys)
+  const submitting = useRef(false)
   // The payment form can unmount mid-way (an expired session shows the visitor's empty cart): keep what was typed,
   // which also pre-fills a next purchase in the same visit.
   const [draft, setDraft] = useState<CheckoutDraft>()
@@ -91,22 +94,35 @@ function CheckoutPage() {
       })
       return
     }
-    // A confirmation already on its way covers this click too.
-    if (placeOrder.isPending) return
-    const expectedTotal = queryClient.getQueryData<{ total: string }>(cartKeys.current)?.total ?? '0'
-    const request = { ...input, expectedTotal }
+    // A confirmation already on its way (revalidating or sending) covers this click too.
+    if (submitting.current) return
+    submitting.current = true
     try {
+      const expectedTotal = queryClient.getQueryData<{ total: string }>(cartKeys.current)?.total ?? '0'
+      // Revalidates price, supply, coupon and fee with the server before sending anything.
+      const quote = await fetchCartQuote()
+      if (compareEth(quote.total, expectedTotal) !== 0) {
+        await showFreshCart()
+        setNotice(QUOTE_CHANGED)
+        return
+      }
+      const request = { ...input, expectedTotal }
       const placed = await placeOrder.mutateAsync({ input: request, idempotencyKey: attemptKeys.keyFor(request) })
       attemptKeys.reset()
       void navigate({ search: (prev) => ({ ...prev, order: placed.id }), replace: true })
     } catch (error) {
-      // Prices or supply moved since the page loaded: show the fresh cart and let the collector confirm again.
-      if (error instanceof ApiError && error.code === 'CONFLICT') {
-        await queryClient.invalidateQueries({ queryKey: cartKeys.current })
-        shownTotal.current = queryClient.getQueryData<{ total: string }>(cartKeys.current)?.total
-      }
+      // The quote moved between the check and the order: the server refused it (409) the same way.
+      if (error instanceof ApiError && error.code === 'CONFLICT') await showFreshCart()
       throw error
+    } finally {
+      submitting.current = false
     }
+  }
+
+  // Shows the server's current cart and records its total as seen, so the realtime notice doesn't repeat the message.
+  const showFreshCart = async () => {
+    await queryClient.invalidateQueries({ queryKey: cartKeys.current })
+    shownTotal.current = queryClient.getQueryData<{ total: string }>(cartKeys.current)?.total
   }
 
   const onSubmit = async (input: CheckoutRequest) => {

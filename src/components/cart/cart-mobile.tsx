@@ -50,10 +50,11 @@ type CartMobileProps = {
   onQuantity: (item: CartItem, quantity: number) => void
   onRemove: (item: CartItem) => void
   onApplyPromo: (code: string) => void
+  onRemovePromo: () => void
   onCheckout: () => void
 }
 
-export function CartMobile({ cart, pending, signedIn, notice, onBack, onQuantity, onRemove, onApplyPromo, onCheckout }: CartMobileProps) {
+export function CartMobile({ cart, pending, signedIn, notice, onBack, onQuantity, onRemove, onApplyPromo, onRemovePromo, onCheckout }: CartMobileProps) {
   return (
     <div className="flex min-h-dvh flex-col">
       <div className="flex flex-col gap-3 px-7 pt-8">
@@ -76,7 +77,7 @@ export function CartMobile({ cart, pending, signedIn, notice, onBack, onQuantity
       </div>
 
       <div className="mt-auto flex flex-1 flex-col justify-between rounded-t-[40px] bg-card px-6 pt-6 pb-[36px]">
-        <CartSummary cart={cart} layout="mobile" pending={pending} signedIn={signedIn} notice={notice} onApplyPromo={onApplyPromo} onCheckout={onCheckout} />
+        <CartSummary cart={cart} layout="mobile" pending={pending} signedIn={signedIn} notice={notice} onApplyPromo={onApplyPromo} onRemovePromo={onRemovePromo} onCheckout={onCheckout} />
       </div>
     </div>
   )

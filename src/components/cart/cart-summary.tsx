@@ -11,10 +11,11 @@ type CartSummaryProps = {
   signedIn?: boolean
   notice?: string
   onApplyPromo: (code: string) => void
+  onRemovePromo: () => void
   onCheckout: () => void
 }
 
-export function CartSummary({ cart, layout, pending, signedIn, notice, onApplyPromo, onCheckout }: CartSummaryProps) {
+export function CartSummary({ cart, layout, pending, signedIn, notice, onApplyPromo, onRemovePromo, onCheckout }: CartSummaryProps) {
   const [code, setCode] = useState(cart.promoCode ?? '')
   const isMobile = layout === 'mobile'
   const empty = cart.itemCount === 0
@@ -73,6 +74,22 @@ export function CartSummary({ cart, layout, pending, signedIn, notice, onApplyPr
             Aplicar
           </button>
         </form>
+        {cart.promoCode && (
+          <div className="flex items-center justify-between gap-3 text-xs leading-4">
+            <p className="text-brand">Cupom {cart.promoCode} aplicado.</p>
+            <button
+              type="button"
+              disabled={pending}
+              onClick={() => {
+                setCode('')
+                onRemovePromo()
+              }}
+              className="rounded-sm underline underline-offset-2 hover:text-brand disabled:opacity-60"
+            >
+              Remover cupom
+            </button>
+          </div>
+        )}
       </div>
 
       <dl className={cn('flex flex-col', isMobile ? 'mt-3 gap-3' : 'gap-3')}>

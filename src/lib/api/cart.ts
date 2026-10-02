@@ -1,6 +1,6 @@
 import { queryOptions, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { api } from './client'
-import type { Cart, CartItemInput } from './types'
+import type { Cart, CartItemInput, CartQuote } from './types'
 
 export const cartKeys = { current: ['cart'] as const }
 
@@ -40,4 +40,26 @@ export function useApplyPromo() {
     mutationFn: async (code: string) => (await api.post<Cart>('/cart/promo', { code })).data,
     onSuccess: rememberCart(queryClient),
   })
+}
+
+export function useRemoveCartItem() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ nftId, editionId }: Pick<CartItemInput, 'nftId' | 'editionId'>) =>
+      (await api.delete<Cart>(`/cart/items/${encodeURIComponent(nftId)}/${encodeURIComponent(editionId)}`)).data,
+    onSuccess: rememberCart(queryClient),
+  })
+}
+
+export function useRemovePromo() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async () => (await api.delete<Cart>('/cart/promo')).data,
+    onSuccess: rememberCart(queryClient),
+  })
+}
+
+/** The server's current price for the cart; always fresh, since it is what a purchase must match. */
+export async function fetchCartQuote() {
+  return (await api.get<CartQuote>('/cart/quote')).data
 }

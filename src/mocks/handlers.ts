@@ -8,6 +8,7 @@ import {
   NFT_TABS,
   type Cart,
   type CartItemInput,
+  type CartQuote,
   type Order,
   type CollectionId,
   type FavoriteList,
@@ -333,6 +334,32 @@ export const handlers: RequestHandler[] = [
       return conflict(message, { code: message })
     }
     return HttpResponse.json<Cart>(result.cart)
+  }),
+
+  // Idempotent: removing a coupon that is not there still answers with the cart.
+  http.delete<never, never, Cart | ApiErrorBody>(`${API}/cart/promo`, async ({ request }) => {
+    await delay(250)
+    if (isScenarioActive('cart-error')) return serviceUnavailable()
+    const cart = cartOwner(request)
+    if ('error' in cart) return cart.error
+    return HttpResponse.json<Cart>(cartStore.removePromo(cart.owner))
+  }),
+
+  http.delete<{ nftId: string; editionId: string }, never, Cart | ApiErrorBody>(`${API}/cart/items/:nftId/:editionId`, async ({ params, request }) => {
+    await delay(250)
+    if (isScenarioActive('cart-error')) return serviceUnavailable()
+    const cart = cartOwner(request)
+    if ('error' in cart) return cart.error
+    const result = cartStore.removeItem(cart.owner, params.nftId, params.editionId)
+    return 'error' in result ? notFound('Este item não está no carrinho.') : HttpResponse.json<Cart>(result.cart)
+  }),
+
+  // The current price of the cart (availability, coupon, discount, fee and total), computed without changing it.
+  http.get<never, never, CartQuote | ApiErrorBody>(`${API}/cart/quote`, async ({ request }) => {
+    await delay(150)
+    const cart = cartOwner(request)
+    if ('error' in cart) return cart.error
+    return HttpResponse.json<CartQuote>(cartStore.quote(cart.owner))
   }),
 
   http.post<never, PlaceOrderRequest, Order | ApiErrorBody>(`${API}/orders`, async ({ request }) => {

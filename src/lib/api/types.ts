@@ -171,6 +171,29 @@ export type Cart = {
   promoCode?: string
 }
 
+/** A cart line as the quote sees it: `reduced` when supply fell under the quantity, `sold-out` when nothing is left. */
+export type QuoteLine = CartItemInput & {
+  unitPrice: EthAmount
+  lineTotal: EthAmount
+  available: number
+  status: 'ok' | 'reduced' | 'sold-out'
+}
+
+/**
+ * `GET /cart/quote`: the server's current price for the cart, without changing it. The payment revalidates it before
+ * confirming; `POST /orders` only accepts the `total` quoted here (`expectedTotal`).
+ */
+export type CartQuote = {
+  lines: QuoteLine[]
+  subtotal: EthAmount
+  discount: EthAmount
+  networkFee: EthAmount
+  total: EthAmount
+  /** The cart's coupon and whether it still applies. */
+  promo: { code: string; status: 'applied' | 'expired' } | null
+  quotedAt: string
+}
+
 export type OrderLine = {
   name: string
   image: string

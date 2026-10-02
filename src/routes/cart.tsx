@@ -13,7 +13,7 @@ import { RetryAlert } from '@/components/ui/inline-alert'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useIsMobile } from '@/hooks/use-media-query'
 import { useSession } from '@/lib/api/auth'
-import { cartQueryOptions, useApplyPromo, useUpdateCartItem } from '@/lib/api/cart'
+import { cartQueryOptions, useApplyPromo, useRemoveCartItem, useRemovePromo, useUpdateCartItem } from '@/lib/api/cart'
 import { getErrorMessage } from '@/lib/api/errors'
 import { suggestedNftsQueryOptions } from '@/lib/api/nfts'
 import type { CartItem } from '@/lib/api/types'
@@ -35,10 +35,12 @@ function CartPage() {
   const suggested = useQuery(suggestedNftsQueryOptions())
   const updateItem = useUpdateCartItem()
   const applyPromo = useApplyPromo()
+  const removeItem = useRemoveCartItem()
+  const removePromo = useRemovePromo()
   const { user } = useSession()
   const [notice, setNotice] = useState<string>()
 
-  const pending = updateItem.isPending || applyPromo.isPending
+  const pending = updateItem.isPending || applyPromo.isPending || removeItem.isPending || removePromo.isPending
   const onBack = () => (canGoBack ? router.history.back() : void router.navigate({ to: '/' }))
 
   const setQuantity = (item: CartItem, quantity: number) => {
@@ -49,7 +51,18 @@ function CartPage() {
     )
   }
 
-  const onRemove = (item: CartItem) => setQuantity(item, 0)
+  const onRemove = (item: CartItem) => {
+    setNotice(undefined)
+    removeItem.mutate({ nftId: item.nftId, editionId: item.editionId }, { onError: (error) => setNotice(getErrorMessage(error)) })
+  }
+
+  const onRemovePromo = () => {
+    setNotice(undefined)
+    removePromo.mutate(undefined, {
+      onSuccess: () => setNotice('Cupom removido.'),
+      onError: (error) => setNotice(getErrorMessage(error)),
+    })
+  }
 
   const onApplyPromo = (code: string) => {
     setNotice(undefined)
@@ -81,6 +94,7 @@ function CartPage() {
         onQuantity={setQuantity}
         onRemove={onRemove}
         onApplyPromo={onApplyPromo}
+        onRemovePromo={onRemovePromo}
         onCheckout={onCheckout}
       />
     ) : (
@@ -92,6 +106,7 @@ function CartPage() {
         onQuantity={setQuantity}
         onRemove={onRemove}
         onApplyPromo={onApplyPromo}
+        onRemovePromo={onRemovePromo}
         onCheckout={onCheckout}
       />
     )

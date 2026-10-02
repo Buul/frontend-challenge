@@ -1,4 +1,4 @@
-import type { Cart, CartItem, CartItemInput } from '@/lib/api/types'
+import type { Cart, CartItem, CartItemInput, CartQuote, QuoteLine } from '@/lib/api/types'
 import { addEth, multiplyEth, percentEth, subtractEth, type EthAmount } from '@/lib/eth'
 import { nftDetails } from './data'
 import { isRecord, persisted } from './storage'
@@ -141,6 +141,44 @@ export const cartStore = {
       items: stored.items.map((item) => (lineKey(item.nftId, item.editionId) === lineKey(input.nftId, input.editionId) ? { ...item, quantity: input.quantity } : item)),
     })
     return { cart: snapshot(owner) }
+  },
+
+  /** Prices the stored cart against current prices and supply without touching it (the clamping happens on `get`). */
+  quote(owner: CartOwner): CartQuote {
+    const stored = read(owner)
+    const lines = stored.items.flatMap((line): QuoteLine[] => {
+      const nft = nftDetails.get(line.nftId)
+      const edition = nft?.editions.find((item) => item.id === line.editionId)
+      if (!nft || !edition) return []
+      const sellable = Math.min(line.quantity, edition.available, edition.maxPerOrder)
+      const status = edition.available === 0 ? 'sold-out' : sellable < line.quantity ? 'reduced' : 'ok'
+      return [{ ...line, unitPrice: nft.price, lineTotal: multiplyEth(nft.price, sellable), available: edition.available, status }]
+    })
+    const subtotal = addEth('0', ...lines.map((line) => line.lineTotal))
+    const promo = activePromo(stored.promoCode)
+    const discount = promo ? percentEth(subtotal, promo.percent) : '0'
+    const networkFee = lines.some((line) => line.status !== 'sold-out') ? NETWORK_FEE : '0'
+    return {
+      lines,
+      subtotal,
+      discount,
+      networkFee,
+      total: addEth(subtractEth(subtotal, discount), networkFee),
+      promo: stored.promoCode ? { code: stored.promoCode, status: promo ? 'applied' : 'expired' } : null,
+      quotedAt: new Date().toISOString(),
+    }
+  },
+
+  removeItem(owner: CartOwner, nftId: string, editionId: string) {
+    const stored = read(owner)
+    if (!stored.items.some((item) => lineKey(item.nftId, item.editionId) === lineKey(nftId, editionId))) return { error: 'not-found' as const }
+    write(owner, { ...stored, items: stored.items.filter((item) => lineKey(item.nftId, item.editionId) !== lineKey(nftId, editionId)) })
+    return { cart: snapshot(owner) }
+  },
+
+  removePromo(owner: CartOwner) {
+    write(owner, { ...read(owner), promoCode: undefined })
+    return snapshot(owner)
   },
 
   applyPromo(owner: CartOwner, code: string) {
