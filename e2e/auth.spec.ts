@@ -112,7 +112,7 @@ test('telas privadas levam o visitante ao login e voltam a elas, com a busca, de
   await expect(page.getByRole('dialog')).toContainText('Entre para finalizar a compra.')
 })
 
-test('link direto abre o login e redireciona só para caminhos internos', async ({ page }) => {
+test('link direto abre o login e redireciona só para caminhos internos', async ({ page, baseURL }) => {
   await page.goto('/?auth=login&redirect=%2Fnfts%2Fnft-3')
   await signIn(page, USERS.bruno)
   await expect(page).toHaveURL(/\/nfts\/nft-3$/)
@@ -121,7 +121,8 @@ test('link direto abre o login e redireciona só para caminhos internos', async 
   await signOut(page, USERS.bruno)
   await page.goto('/?auth=login&redirect=%2F%2Fexample.com')
   await signIn(page, USERS.bruno)
-  await expect(page).toHaveURL(/^http:\/\/[^/]+\/$/)
+  // `//example.com` is refused: signing in stays on this site's home, whatever the protocol (http locally, https deployed).
+  await expect(page).toHaveURL(`${new URL(baseURL!).origin}/`)
 })
 
 test('fechar o diálogo volta ao estado anterior do histórico', async ({ page }) => {

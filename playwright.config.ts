@@ -1,7 +1,13 @@
 import { defineConfig, devices } from '@playwright/test'
 
 const PORT = 4318
-const baseURL = `http://127.0.0.1:${PORT}`
+const localURL = `http://127.0.0.1:${PORT}`
+/**
+ * `E2E_BASE_URL` points the suite at an already running app (e.g. the production deployment) instead of building and
+ * serving it locally. The mocks run in the browser, so a deployed build is tested exactly like the local one.
+ */
+const remoteURL = process.env.E2E_BASE_URL?.replace(/\/$/, '')
+const baseURL = remoteURL ?? localURL
 
 export default defineConfig({
   testDir: './e2e',
@@ -32,10 +38,12 @@ export default defineConfig({
     },
     { name: 'mobile', use: { ...devices['Pixel 7'], viewport: { width: 390, height: 844 } } },
   ],
-  webServer: {
-    command: 'pnpm build && pnpm preview',
-    url: baseURL,
-    reuseExistingServer: !process.env.CI,
-    timeout: 120_000,
-  },
+  webServer: remoteURL
+    ? undefined
+    : {
+        command: 'pnpm build && pnpm preview',
+        url: localURL,
+        reuseExistingServer: !process.env.CI,
+        timeout: 120_000,
+      },
 })
