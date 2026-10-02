@@ -65,12 +65,16 @@ Contas fictícias: `ana@kurio.dev` / `Kurio@123` e `bruno@kurio.dev` / `Kurio@45
 | `GET /cart` | `{ items, itemCount, subtotal, discount, networkFee, total, promoCode? }` do dono: o usuário autenticado ou, sem token, o visitante deste navegador. Ao entrar ou criar a conta, o carrinho do visitante passa para a conta |
 | `POST /cart/items` `{ nftId, editionId, quantity }` | Soma à linha existente (mesmo NFT e edição), respeitando estoque e o máximo por pedido; `409` se esgotado ou no limite |
 | `PATCH /cart/items` `{ nftId, editionId, quantity }` | Define a quantidade; `0` remove a linha |
+| `DELETE /cart/items/:nftId/:editionId` | Remove a linha; `404` se ela não está no carrinho |
 | `POST /cart/promo` `{ code }` | Aplica um código (`KURIO10` dá 10% sobre o subtotal); `409` se o código for inválido ou expirado (`LANCAMENTO20`) |
+| `DELETE /cart/promo` | Remove o cupom do carrinho (idempotente) |
+| `GET /cart/quote` | Cotação atual do carrinho sem alterá-lo: linhas com preço e disponibilidade (`ok`, `reduced`, `sold-out`), cupom (`applied` ou `expired`), desconto, taxa e total. O pagamento a consulta antes de confirmar, e `POST /orders` só aceita esse total |
 | `POST /orders` `{ ...perfil, expectedTotal }` + cabeçalho `Idempotency-Key` | Exige login. Repetir com a mesma chave e o mesmo corpo devolve o mesmo pedido; a mesma chave com outro corpo é `409`. Copia o carrinho para um pedido `pending` (`id`, `status`, `version`, totais, itens), esvazia o carrinho e responde `202`. A carteira simulada responde depois, por `order.updated`: `confirmed` (com `txId`) ou `refused` (com `failureReason`; os itens voltam ao carrinho). `409` se o carrinho estiver vazio ou se `expectedTotal` não for mais o total do carrinho (preço ou estoque mudou), `422` se o perfil for inválido |
 | `GET /orders/:id` | Exige login. O pedido no estado atual; `404` se não existir, `403` se for de outra conta |
 
 - O token vai em `Authorization: Bearer` e fica em `localStorage['kurio:session-token']`, para sobreviver ao refresh e valer entre abas (diferente de um cookie httpOnly, é legível por scripts, aceitável nesta demo).
 - Login e cadastro são um diálogo aberto por `?auth=login` ou `?auth=signup` em qualquer tela, com `redirect=/caminho` opcional (apenas caminhos internos). Alternar entre os dois substitui a entrada do histórico, mantendo o `redirect`. Ações que exigem login (favoritar) abrem o diálogo e são retomadas ao entrar ou ao criar a conta.
+- `/checkout`, `/profile` e `/wallets` são protegidas no router (`beforeLoad`): um visitante vai para o carrinho (pagamento) ou para o início (perfil e carteiras) com o login aberto, e volta à tela pedida, com a busca, depois de entrar.
 - Comprar no detalhe adiciona ao carrinho (`/cart`). Visitantes podem montar o carrinho; **Conectar e finalizar** pede login e abre `/checkout`. Quem já entrou vê **Finalizar** e segue direto. No desktop o colecionador preenche o perfil; no mobile escolhe uma carteira salva e a rede. **Confirmar compra** envia o pedido com o total exibido e abre o diálogo em **Confirmando o pagamento**; o pedido fica na URL (`/checkout?order=KR-…`), então um refresh ou uma reconexão retomam o acompanhamento. Quando a carteira responde, o diálogo vira o recibo (com link para o Etherscan) ou **Pagamento recusado**.
 - O perfil do colecionador fica em `/profile`, pelo menu da conta (**Meu perfil**) ou pelo rodapé. Visitante vê o pedido de login. **Salvar** grava nome, usuário, e-mail, ENS e apelido da carteira. **Alterar**/**Remover** salvam o avatar na hora. A troca de senha só vale quando os três campos são preenchidos. **Carteiras** (`/wallets`) guarda a carteira principal e, se quiser, uma secundária ou a cópia da principal.
 - Os formulários de login e cadastro usam TanStack Form, validados por schemas Zod em `src/lib/validation.ts`. O mock valida o corpo das requisições com os mesmos schemas. Regras do cadastro: nome de usuário com 2 a 40 caracteres, e-mail válido, senha com pelo menos 8 caracteres incluindo letras e números, e confirmação igual à senha.
@@ -78,6 +82,13 @@ Contas fictícias: `ana@kurio.dev` / `Kurio@123` e `bruno@kurio.dev` / `Kurio@45
 - Dados privados ficam sob a chave de query `['me', userId, ...]`; logout, expiração, troca de usuário e login/logout em outra aba removem essas queries e as mutations pendentes.
 - Em desenvolvimento, os devtools do TanStack Query e do TanStack Router aparecem nos cantos inferiores.
 - Novos componentes shadcn/ui: `pnpm dlx shadcn@latest add <componente>`.
+
+### Estado, cache e reconciliação
+
+- **Carrinho:** vive no servidor (mock), um por dono: o usuário autenticado ou o visitante do navegador. Ao entrar, o carrinho do visitante passa para a conta. Totais, descontos e taxa são sempre calculados pelo servidor; o app só exibe. O cache do carrinho é descartado quando muda o dono (logout, outro usuário) e só revalidado quando a mesma pessoa entra de novo.
+- **Cache (TanStack Query):** `staleTime` padrão de 30 s; destaques, relacionados e sugeridos 5 min; facetas e pedidos sem expiração (pedidos mudam por evento). Dados de usuário ficam sob `['me', userId, …]` e são removidos no logout, na expiração e na troca de usuário. Mutations devolvem o recurso inteiro, que substitui o cache; favoritos são otimistas com rollback.
+- **Retries:** consultas repetem falhas transitórias (rede, timeout, 429, 5xx) duas vezes; mutations só repetem quando idempotentes (o pedido, com a mesma `Idempotency-Key`).
+- **REST × Socket.IO:** eventos atualizam o cache só se trouxerem versão mais nova que a que ele tem (do REST ou de outro evento); duplicados são ignorados pelo `id`. Ao reconectar, o app rebusca pelo REST NFTs, carrinho e pedidos em tela. Detalhes em [ARCHITECTURE.md](ARCHITECTURE.md).
 
 ### Tempo real (Socket.IO)
 
@@ -146,7 +157,7 @@ Depois, `kurioMock.reset()` limpa tudo.
 
 ### Lighthouse
 
-`pnpm lighthouse` faz o build, sobe o preview e audita `/` e `/nfts/nft-1` nos perfis desktop e mobile, 3 vezes cada, falhando se a mediana ficar abaixo das metas (Performance ≥ 90, Acessibilidade ≥ 95, Boas práticas ≥ 95, SEO ≥ 90). No fim imprime as medianas com LCP, CLS e TBT (`node scripts/lighthouse-summary.mjs` reimprime). Os relatórios ficam em `.lighthouseci/desktop` e `.lighthouseci/mobile`. Por padrão usa o Chromium instalado pelo Playwright; defina `CHROME_PATH` para usar outro navegador. Os resultados e a análise estão em [ARCHITECTURE.md](ARCHITECTURE.md#performance).
+`pnpm lighthouse` faz o build, sobe o preview e audita `/` e `/nfts/nft-1` nos perfis desktop e mobile, 3 vezes cada, falhando se a mediana ficar abaixo das metas (Performance ≥ 90, Acessibilidade ≥ 95, Boas práticas ≥ 95, SEO ≥ 90). No fim copia os relatórios HTML e JSON da execução mediana de cada página e perfil para [`lighthouse/`](lighthouse/RESULTS.md), versionada, e escreve `lighthouse/RESULTS.md` com as notas, LCP, CLS, TBT, versões das ferramentas, ambiente e condições. As execuções brutas ficam em `.lighthouseci/` (ignorada). Por padrão usa o Chromium instalado pelo Playwright; defina `CHROME_PATH` para usar outro navegador. A análise está em [ARCHITECTURE.md](ARCHITECTURE.md#performance).
 
 ## Deploy
 
@@ -173,6 +184,7 @@ src/
   components/devtools.tsx Devtools do TanStack (apenas em dev)
 e2e/                      Testes Playwright (fluxos, tempo real, acessibilidade, visual)
 lighthouserc.cjs          Configuração do Lighthouse CI (perfil por LHCI_FORM_FACTOR)
-scripts/                  Resumo das medianas do Lighthouse
+scripts/                  Exportação das medianas do Lighthouse
+lighthouse/               Relatórios HTML/JSON medianos e RESULTS.md (versionados)
 ARCHITECTURE.md           Contratos, políticas, decisões e limitações
 ```

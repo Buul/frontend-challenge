@@ -48,7 +48,10 @@ Base: `VITE_API_URL` (padrão `/api`). Corpo JSON. Autenticação: `Authorizatio
 | Carrinho | `GET /cart` | `200 Cart` do dono (usuário ou visitante) | `401` se o token não vale mais |
 | | `POST /cart/items` `{ nftId, editionId, quantity }` | `200 Cart`; soma à linha existente | `404`, `409` esgotado ou no limite |
 | | `PATCH /cart/items` `{ nftId, editionId, quantity }` | `200 Cart`; `0` remove | `404`, `409` |
+| | `DELETE /cart/items/:nftId/:editionId` | `200 Cart` | `404` |
 | Preço | `POST /cart/promo` `{ code }` | `200 Cart` com `discount` | `409` código inválido ou expirado |
+| | `DELETE /cart/promo` | `200 Cart` sem cupom; idempotente | `503` |
+| Cotação | `GET /cart/quote` | `200 { lines[{ …, unitPrice, lineTotal, available, status }], subtotal, discount, networkFee, total, promo, quotedAt }`, sem alterar o carrinho | `401` |
 | Pedidos | `POST /orders` + `Idempotency-Key` `{ …perfil, expectedTotal }` | `202 Order` `pending`; retentativa com a mesma chave e o mesmo corpo → `200` o mesmo pedido | `401`, `422` sem chave ou perfil inválido, `409` carrinho vazio, total mudou ou chave reutilizada com outro corpo, `503` |
 | | `GET /orders/:id` | `200 Order` no estado atual | `401`, `403` (pedido de outra conta), `404` |
 | Perfil | `GET /auth/profile`, `PATCH /auth/profile` | `200` | `422` (inclusive senha atual errada), `409` e-mail em uso, `503` |
@@ -58,7 +61,7 @@ Base: `VITE_API_URL` (padrão `/api`). Corpo JSON. Autenticação: `Authorizatio
 | | `PUT /auth/wallets/:slot` | `200` com as carteiras | `404` se ainda não existe, `422`, `503` |
 | | `PATCH /auth/wallets` `{ mirrorPrimary }` | `200` | `422` sem carteira principal, `503` |
 
-**Preço e totais.** O servidor calcula subtotal, desconto, taxa de rede e total; o cliente só exibe. O `expectedTotal` do pedido é o total que o colecionador viu. Se o preço ou o estoque mudou desde então, o servidor responde `409` antes de mexer no carrinho, e o checkout mostra o total novo para nova confirmação.
+**Preço e totais.** O servidor calcula subtotal, desconto, taxa de rede e total; o cliente só exibe. Valores em ETH trafegam como strings decimais e são somados e multiplicados como inteiros de 18 casas (`lib/eth.ts`), sem ponto flutuante; quantidades são inteiras. Antes de confirmar, o pagamento consulta `GET /cart/quote`: se o total mudou (preço, estoque, cupom vencido ou taxa), mostra o novo total e pede nova confirmação, sem enviar o pedido. O `expectedTotal` do pedido é o total que o colecionador viu. Se o preço ou o estoque mudou desde então, o servidor responde `409` antes de mexer no carrinho, e o checkout mostra o total novo para nova confirmação.
 
 ## Tempo real
 
@@ -87,6 +90,7 @@ Envelope de todo evento ([events.ts](src/lib/realtime/events.ts)):
 
 - `POST /auth/login|register` devolvem `{ token, expiresAt, user }`. O token fica em `localStorage['kurio:session-token']`: sobrevive ao refresh e vale entre abas. Diferente de um cookie httpOnly, é legível por scripts, o que é aceitável numa demo sem backend.
 - Expiração em 30 min. Há três gatilhos: um `401` numa requisição autenticada, o timer de `expiresAt` e o evento `storage` de outra aba. Em todos, a sessão termina, os dados privados são removidos e o login reabre sobre a mesma tela. A ação interrompida (favoritar, finalizar compra) é retomada depois de entrar.
+- **Rotas privadas:** `/checkout`, `/profile` e `/wallets` têm um `beforeLoad` (`lib/auth/require-session.ts`) que manda o visitante ao login (no carrinho ou no início) com `redirect` para a tela pedida, busca incluída, sem levar junto os parâmetros do diálogo. Se a sessão expira com a tela aberta, ela continua lá e pede login no lugar.
 - O login e o cadastro são um diálogo endereçável por `?auth=login|signup&redirect=`, que aceita só caminhos internos. Fechar volta ao histórico anterior e devolve o foco.
 - **Isolamento.** Todo dado de usuário fica sob `['me', userId, …]`. Login, logout, expiração e troca de usuário cancelam e removem essas queries e as mutations pendentes, e callbacks tardios conferem `currentUserId` antes de escrever. O carrinho, que não é privado na chave, é resetado em toda troca de identidade, depois de o token novo valer.
 
@@ -95,7 +99,7 @@ Envelope de todo evento ([events.ts](src/lib/realtime/events.ts)):
 - O servidor guarda um carrinho por dono: o usuário autenticado ou o visitante do navegador (`kurio:mock:carts`). O visitante monta o carrinho sem login.
 - **Merge.** Ao entrar (login ou cadastro), o servidor move as linhas do visitante para a conta, somando quantidades e respeitando estoque e limite por pedido, e esvazia o carrinho de visitante. Depois do logout o navegador começa um carrinho de visitante novo, e o próximo usuário não vê o carrinho do anterior.
 - **Persistência e consistência.** Cada leitura reidrata as linhas com preço e estoque atuais: quantidades são limitadas ao disponível, linhas esgotadas somem e cupons expirados caem. Mutations devolvem o carrinho inteiro, que substitui o cache.
-- **Cupons.** `KURIO10` dá 10%; `LANCAMENTO20` existe mas expirou, para exercitar a mensagem própria.
+- **Cupons.** `KURIO10` dá 10%; `LANCAMENTO20` existe mas expirou, para exercitar a mensagem própria. O cupom aplicado pode ser removido (`DELETE /cart/promo`).
 
 ## Pedidos
 
@@ -145,20 +149,20 @@ Playwright, Chromium, nas larguras do desafio: `desktop` (1440×900) e `mobile` 
 | 2. Acesso direto ao detalhe e recurso inexistente | `nft-detail.spec.ts` |
 | 3. Cadastro, login, expiração (inclusive por relógio e no meio do pagamento), logout, troca de usuário | `auth.spec.ts`, `checkout.spec.ts` |
 | 4. Favoritos com falha e recuperação | `favorites.spec.ts` |
-| 5. Carrinho: quantidades, remoção, cupons, persistência, merge, isolamento | `cart.spec.ts` |
+| 5. Carrinho: quantidades, remoção, cupons (aplicar, inválido, expirado, remover), persistência, merge, isolamento | `cart.spec.ts` |
 | 6. Compra do catálogo ao recibo | `checkout.spec.ts`, `realtime.spec.ts` |
 | 7. Falha de pagamento, cliques repetidos, timeout | `checkout.spec.ts`, `realtime.spec.ts` (recusa, carteira desconectada) |
 | 8. Perfil, avatar, senha e carteiras (principal, secundária, espelho, contrato REST) com erros | `profile.spec.ts`, `wallets.spec.ts` |
-| 9. Preço e estoque via Socket.IO durante o checkout | `realtime.spec.ts` |
+| 9. Preço e disponibilidade via Socket.IO durante o checkout (esgotar e reduzir), cotação revalidada | `realtime.spec.ts` |
 | 10. Duplicados (eventos e cenário), atrasados, desconexão, servidor offline, pedido pendente | `realtime.spec.ts` |
-| 11. Teclado, foco em diálogos (login e recibo), validação com erro associado ao campo | `a11y.spec.ts`, `auth.spec.ts`, `checkout.spec.ts`, `profile.spec.ts` |
+| 11. Teclado, foco em diálogos (login e recibo) e no drawer de filtros, validação com erro associado ao campo, rotas privadas | `a11y.spec.ts`, `auth.spec.ts`, `catalog.spec.ts`, `checkout.spec.ts`, `profile.spec.ts` |
 | 12. Skeletons, erro, rede offline, respostas fora de ordem e retry | `catalog.spec.ts`, `favorites.spec.ts` |
 | Também | Ações do card no hover, galeria, abas, compartilhar, newsletter | `catalog.spec.ts`, `nft-detail.spec.ts` |
 | Regressão visual: home, detalhe, carrinho, pagamento | `visual.spec.ts`, em 1440, 768 e 390 (baselines em `e2e/__screenshots__/`) |
 
 ## Performance
 
-`pnpm lighthouse` audita `/` e `/nfts/nft-1` no build de produção, com o mock padrão, 3 execuções por página e perfil, e afirma sobre a mediana. Medianas da última execução:
+`pnpm lighthouse` audita `/` e `/nfts/nft-1` no build de produção, com o mock padrão, 3 execuções por página e perfil, e afirma sobre a mediana. Os relatórios HTML e JSON das medianas, as versões (Lighthouse 12.6.1, Lighthouse CI 0.15.1, HeadlessChrome 153), o ambiente e as condições de execução estão em [`lighthouse/RESULTS.md`](lighthouse/RESULTS.md). Medianas da última execução:
 
 | Perfil | Página | Performance | Acessibilidade | Boas práticas | SEO | LCP | CLS | TBT |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -185,6 +189,13 @@ No mobile, a margem é pequena (90–91). O LCP fica em ~3,3 s porque o app só 
 - **Anúncios:** regiões `role=status`/`alert` para resultados de busca, mutations, mudanças em tempo real e estados do pedido.
 - **Imagens e estados:** imagens com texto alternativo (decorativas com `alt=""`). Estados não dependem só de cor: edição esgotada tem "(esgotada)" e `disabled`, e botões ativos usam `aria-pressed`/`aria-current`.
 - **Toque, movimento e reflow:** alvos de toque de 24 px (pontos de carrosséis e da galeria), `prefers-reduced-motion` desliga shimmer e transições, e não há rolagem horizontal a 320 px (zoom de 400%), coberto por teste.
+
+## Assets
+
+- **Origem:** os 77 arquivos de `src/assets/figma/` foram exportados do arquivo do Figma: ícones em SVG (navegação, carrinho, favoritos, carteiras, perfil, login social), as 4 artes dos NFTs em JPG, a ilustração "Thank you" do recibo e as máscaras decorativas do hero. Nada vem de CDN: tudo entra no build e roda localmente.
+- **Fonte:** Roboto Mono, a do design, vem empacotada pelo `@fontsource-variable/roboto-mono` (woff2 no próprio build) em vez do Google Fonts, para funcionar offline e não depender de terceiros na auditoria.
+- **Substituições:** o Figma tem 4 artes; os 36 NFTs das fixtures reaproveitam essas 4, com nomes e preços próprios para exercitar filtros e paginação (alguns nomes do Figma, como "Golden Frequency #071", não existem nas fixtures). As imagens da galeria do detalhe repetem a arte principal, como no design. O favicon é o do template inicial.
+- **Ajustes de acessibilidade sobre o design:** alvos de toque de 24 px nos pontos de carrossel e galeria, foco visível em todos os controles, o "Avatar" como grupo rotulado e textos alternativos nas artes (descrições escritas para as 4 artes do Figma). Os demais estão em [Acessibilidade](#acessibilidade) e [Desvios do Figma](#desvios-do-figma).
 
 ## Componentes compartilhados
 
