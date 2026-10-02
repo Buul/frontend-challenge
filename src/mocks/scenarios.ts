@@ -20,6 +20,23 @@ export type MockScenario =
   | 'profile-error'
   /** `PUT /auth/wallets` answers 503. */
   | 'wallets-error'
+  /** The wallet refuses the payment: orders settle as `refused` and the items go back to the cart. */
+  | 'payment-refused'
+  /** The realtime server refuses connections; clients keep retrying until the scenario is lifted. */
+  | 'realtime-offline'
+  /** Every NFT event is delivered twice, exercising duplicate tolerance on the client. */
+  | 'realtime-duplicates'
+  /** Random price changes are pushed every few seconds, to watch realtime updates by hand. */
+  | 'market-live'
 
 export const isScenarioActive = (scenario: MockScenario) =>
   (localStorage.getItem(SCENARIOS_STORAGE_KEY) ?? '').split(',').map((value) => value.trim()).includes(scenario)
+
+/** How long a pending order waits for the simulated wallet; tests shorten or stretch it via `localStorage`. */
+export const ORDER_SETTLE_DELAY_KEY = 'kurio:mock:order-settle-ms'
+const DEFAULT_ORDER_SETTLE_MS = 1500
+
+export function orderSettleDelay() {
+  const value = Number(localStorage.getItem(ORDER_SETTLE_DELAY_KEY))
+  return Number.isFinite(value) && value >= 0 && localStorage.getItem(ORDER_SETTLE_DELAY_KEY) !== null ? value : DEFAULT_ORDER_SETTLE_MS
+}

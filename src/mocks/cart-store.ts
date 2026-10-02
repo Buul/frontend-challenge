@@ -123,4 +123,18 @@ export const cartStore = {
     store.write({ items: [] })
     return { cart }
   },
+
+  /** Gives back the lines of a refused order, merged with whatever was added to the cart meanwhile. */
+  restore(lines: StoredLine[], promoCode?: string) {
+    const stored = store.read()
+    const items = [...stored.items]
+    for (const line of lines) {
+      const current = items.findIndex((item) => lineKey(item.nftId, item.editionId) === lineKey(line.nftId, line.editionId))
+      if (current === -1) items.push(line)
+      else items[current] = { ...items[current], quantity: items[current].quantity + line.quantity }
+    }
+    store.write({ items, promoCode: stored.promoCode ?? promoCode })
+    // Hydrating clamps quantities to the current supply and drops lines that sold out meanwhile.
+    return snapshot()
+  },
 }

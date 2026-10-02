@@ -10,6 +10,17 @@ const shortTx = (txId: string) => `${txId.slice(0, 6)}…${txId.slice(-4)}`
 
 const etherscanHref = (txId: string) => `https://etherscan.io/tx/${txId}`
 
+type ConfirmedOrder = Order & { txId: string }
+
+const isConfirmed = (order: Order): order is ConfirmedOrder => order.status === 'confirmed' && order.txId !== undefined
+
+const STATUS_ANNOUNCEMENTS: Record<Order['status'], string> = {
+  pending: 'Aguardando a confirmação da carteira.',
+  confirmed: 'Pagamento confirmado.',
+  refused: 'Pagamento recusado.',
+}
+
+/** Follows the order from `pending` to its receipt or refusal; the state arrives through `order.updated`. */
 export function OrderDialog({ order, onClose }: { order?: Order; onClose: () => void }) {
   const isMobile = useIsMobile()
 
@@ -23,13 +34,27 @@ export function OrderDialog({ order, onClose }: { order?: Order; onClose: () => 
             : 'w-[578px] max-w-[calc(100vw-2rem)] rounded-none bg-card',
         )}
       >
-        {order && (isMobile ? <MobileReceipt order={order} /> : <DesktopReceipt order={order} />)}
+        {order && (
+          <p role="status" className="sr-only">
+            {STATUS_ANNOUNCEMENTS[order.status]}
+          </p>
+        )}
+        {order &&
+          (isConfirmed(order) ? (
+            isMobile ? (
+              <MobileReceipt order={order} />
+            ) : (
+              <DesktopReceipt order={order} />
+            )
+          ) : (
+            <OrderProgress order={order} onClose={onClose} />
+          ))}
       </DialogContent>
     </Dialog>
   )
 }
 
-function DesktopReceipt({ order }: { order: Order }) {
+function DesktopReceipt({ order }: { order: ConfirmedOrder }) {
   return (
     <div className="relative flex max-h-[calc(100svh-2rem)] flex-col">
       <CloseButton />
@@ -72,7 +97,7 @@ function DesktopReceipt({ order }: { order: Order }) {
   )
 }
 
-function MobileReceipt({ order }: { order: Order }) {
+function MobileReceipt({ order }: { order: ConfirmedOrder }) {
   return (
     <div className="relative flex h-full flex-col">
       <CloseButton />
@@ -101,6 +126,43 @@ function MobileReceipt({ order }: { order: Order }) {
         <Totals order={order} className="mt-6" />
         <div className="mt-4 h-px bg-primary" />
         <Note order={order} buttonClassName="flex h-[60px] w-full items-center justify-center rounded-[40px] bg-[linear-gradient(108.86deg,var(--primary)_3.96%,color-mix(in_srgb,var(--primary)_80%,transparent)_121.97%)]" />
+      </div>
+      <AccentBar />
+    </div>
+  )
+}
+
+/** Pending and refused orders: no receipt yet (or ever), just where the payment stands. */
+function OrderProgress({ order, onClose }: { order: Order; onClose: () => void }) {
+  const pending = order.status === 'pending'
+
+  return (
+    <div className="relative flex h-full flex-col justify-center sm:h-auto">
+      <CloseButton />
+      <div className="flex flex-col items-center gap-5 px-9 pt-12 pb-10 text-center">
+        {pending ? (
+          <span aria-hidden className="size-12 animate-spin rounded-full border-4 border-primary/30 border-t-primary motion-reduce:animate-none" />
+        ) : (
+          <span aria-hidden className="grid size-12 place-items-center rounded-full border-2 border-destructive text-2xl leading-none font-bold text-destructive">
+            !
+          </span>
+        )}
+        <DialogTitle className="text-lg leading-6 font-bold">{pending ? 'Confirmando o pagamento' : 'Pagamento recusado'}</DialogTitle>
+        <DialogDescription className="max-w-[380px] text-sm leading-[22px] text-muted-foreground">
+          {pending
+            ? `Confirme a transação de ${formatEth(order.total)} na ${order.walletName}. O recibo aparece aqui assim que a ${order.networkLabel} responder.`
+            : order.failureReason}
+        </DialogDescription>
+        <p className="text-xs leading-4 text-tertiary">Pedido {order.id}</p>
+        {!pending && (
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-[5px] bg-primary px-6 py-4 text-base leading-4 font-bold text-primary-foreground hover:opacity-90"
+          >
+            Revisar e tentar de novo
+          </button>
+        )}
       </div>
       <AccentBar />
     </div>
@@ -192,7 +254,7 @@ function Totals({ order, className }: { order: Order; className?: string }) {
   )
 }
 
-function Note({ order, buttonClassName }: { order: Order; buttonClassName?: string }) {
+function Note({ order, buttonClassName }: { order: ConfirmedOrder; buttonClassName?: string }) {
   return (
     <div className="flex flex-col items-center gap-6 pt-3">
       <p className="text-center text-sm leading-[22px] text-muted-foreground">

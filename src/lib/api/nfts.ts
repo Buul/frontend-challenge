@@ -2,7 +2,7 @@ import { keepPreviousData, queryOptions } from '@tanstack/react-query'
 import { api } from './client'
 import type { FeaturedNftList, NftDetail, NftFacets, NftPage, NftQuery, RelatedNftList } from './types'
 
-const nftKeys = {
+export const nftKeys = {
   all: ['nfts'] as const,
   list: (query: NftQuery) => [...nftKeys.all, 'list', query] as const,
   facets: () => [...nftKeys.all, 'facets'] as const,

@@ -29,8 +29,15 @@ pnpm dev
 
 Acesse <http://localhost:4317>.
 
-- O **MSW** é iniciado no navegador com os handlers de `src/mocks/handlers.ts`.
-- Cenários de falha do mock são ativados por `localStorage['kurio:mock-scenarios']` (lista separada por vírgula): `favorites-error` (favoritar/desfavoritar responde 503), `login-error` (login responde 503), `signup-error` (cadastro responde 503), `cart-error` (carrinho responde 503), `checkout-error` (pagamento responde 503), `profile-error` (salvar o perfil responde 503) e `wallets-error` (salvar a carteira responde 503).
+- O **MSW** é iniciado no navegador com os handlers de `src/mocks/handlers.ts` (REST) e `src/mocks/realtime.ts` (Socket.IO). Não há backend: o estado do mock (contas, sessões, carrinho, pedidos, preços e estoque) fica no `localStorage`, sob chaves `kurio:mock*`.
+- Cenários do mock são ativados por `localStorage['kurio:mock-scenarios']` (lista separada por vírgula), antes de carregar a página:
+  - Falhas `503`: `favorites-error` (favoritar/desfavoritar), `login-error`, `signup-error`, `cart-error` (alterar o carrinho), `checkout-error` (`POST /orders`), `profile-error` (salvar o perfil) e `wallets-error` (salvar a carteira).
+  - `payment-refused`: a carteira recusa o pagamento; o pedido termina `refused` e os NFTs voltam ao carrinho.
+  - `realtime-offline`: o servidor Socket.IO recusa conexões; o app mostra o aviso de reconexão e continua tentando.
+  - `realtime-duplicates`: todo `nft.updated` é entregue duas vezes.
+  - `market-live`: a cada 8 s o preço de um NFT em destaque muda, para ver o tempo real sem DevTools.
+- `localStorage['kurio:mock:order-settle-ms']` define quanto a carteira simulada leva para responder a um pedido (padrão `1500`).
+- `window.kurioMock.reset()` apaga todo o estado do mock (inclusive os cenários) e recarrega a página.
 
 ### Sessão
 
@@ -51,18 +58,40 @@ Contas fictícias: `ana@kurio.dev` / `Kurio@123` e `bruno@kurio.dev` / `Kurio@45
 | `POST /cart/items` `{ nftId, editionId, quantity }` | Soma à linha existente (mesmo NFT e edição), respeitando estoque e o máximo por pedido; `409` se esgotado ou no limite |
 | `PATCH /cart/items` `{ nftId, editionId, quantity }` | Define a quantidade; `0` remove a linha |
 | `POST /cart/promo` `{ code }` | Aplica um código (`KURIO10` dá 10% sobre o subtotal); `409` se o código for inválido |
-| `POST /orders` | Exige login. Copia o carrinho para um recibo (`id`, `txId`, totais, itens), esvazia o carrinho e devolve o recibo; `409` se o carrinho estiver vazio, `422` se o perfil for inválido |
+| `POST /orders` `{ ...perfil, expectedTotal }` | Exige login. Copia o carrinho para um pedido `pending` (`id`, `status`, `version`, totais, itens), esvazia o carrinho e responde `202`. A carteira simulada responde depois, por `order.updated`: `confirmed` (com `txId`) ou `refused` (com `failureReason`; os itens voltam ao carrinho). `409` se o carrinho estiver vazio ou se `expectedTotal` não for mais o total do carrinho (preço ou estoque mudou), `422` se o perfil for inválido |
+| `GET /orders/:id` | Exige login. O pedido no estado atual; `404` se não existir ou for de outro usuário |
 
 - O token vai em `Authorization: Bearer` e fica em `localStorage['kurio:session-token']`, para sobreviver ao refresh e valer entre abas (diferente de um cookie httpOnly, é legível por scripts, aceitável nesta demo).
 - Login e cadastro são um diálogo aberto por `?auth=login` ou `?auth=signup` em qualquer tela, com `redirect=/caminho` opcional (apenas caminhos internos). Alternar entre os dois substitui a entrada do histórico, mantendo o `redirect`. Ações que exigem login (favoritar) abrem o diálogo e são retomadas ao entrar ou ao criar a conta.
-- Comprar no detalhe adiciona ao carrinho (`/cart`). Visitantes podem montar o carrinho; **Conectar e finalizar** pede login e abre `/checkout`. Quem já entrou vê **Finalizar** e segue direto. **Confirmar compra** envia o pedido e abre o recibo, com link para o Etherscan. No desktop o colecionador preenche o perfil; no mobile escolhe uma carteira salva e a rede.
+- Comprar no detalhe adiciona ao carrinho (`/cart`). Visitantes podem montar o carrinho; **Conectar e finalizar** pede login e abre `/checkout`. Quem já entrou vê **Finalizar** e segue direto. No desktop o colecionador preenche o perfil; no mobile escolhe uma carteira salva e a rede. **Confirmar compra** envia o pedido com o total exibido e abre o diálogo em **Confirmando o pagamento**; o pedido fica na URL (`/checkout?order=KR-…`), então um refresh ou uma reconexão retomam o acompanhamento. Quando a carteira responde, o diálogo vira o recibo (com link para o Etherscan) ou **Pagamento recusado**.
 - O perfil do colecionador fica em `/profile`, pelo menu da conta (**Meu perfil**) ou pelo rodapé. Visitante vê o pedido de login. **Salvar** grava nome, usuário, e-mail, ENS e apelido da carteira. A troca de senha só vale quando os três campos são preenchidos. **Carteiras** (`/wallets`) guarda a carteira principal e, se quiser, uma secundária ou a cópia da principal.
 - Os formulários de login e cadastro usam TanStack Form, validados por schemas Zod em `src/lib/validation.ts`. O mock valida o corpo das requisições com os mesmos schemas. Regras do cadastro: nome de usuário com 2 a 40 caracteres, e-mail válido, senha com pelo menos 8 caracteres incluindo letras e números, e confirmação igual à senha.
 - Sessão expira em 30 min. Um `401` em requisição autenticada, ou o `expiresAt` vencendo, encerra a sessão e reabre o login sobre a mesma tela. Para simular a expiração no servidor, apague `localStorage['kurio:mock:sessions']`.
 - Dados privados ficam sob a chave de query `['me', userId, ...]`; logout, expiração, troca de usuário e login/logout em outra aba removem essas queries e as mutations pendentes.
-- O **Socket.IO** roda dentro do próprio servidor do Vite (plugin em `server/realtime.ts`), tanto em `pnpm dev` quanto em `pnpm preview`.
 - Em desenvolvimento, os devtools do TanStack Query e do TanStack Router aparecem nos cantos inferiores.
 - Novos componentes shadcn/ui: `pnpm dlx shadcn@latest add <componente>`.
+
+### Tempo real (Socket.IO)
+
+O app usa o `socket.io-client` de verdade. O servidor é simulado pelo MSW (`src/mocks/socket-io.ts`): ele intercepta o WebSocket e fala o protocolo Socket.IO (handshake do Engine.IO, `auth` no CONNECT, ping e eventos) com os parsers oficiais (`engine.io-parser` e `socket.io-parser`), sobre o mesmo estado do REST. O `@mswjs/socket.io-binding` não foi usado porque só suporta o MSW 2 e não lê o `auth` do handshake.
+
+| Evento | Quem recebe | Efeito no app |
+| --- | --- | --- |
+| `nft.updated` `{ price, previousPrice?, editions[{ id, available }], updatedAt }` | Todos | Atualiza catálogo, destaque, relacionados e detalhe; refaz o carrinho pelo REST se o NFT estiver nele. Avisa (região `aria-live`) quando o preço muda no detalhe aberto, ou quando um item do carrinho muda de preço, esgota ou tem a quantidade ajustada. No checkout, um total novo gera o aviso para revisar antes de confirmar |
+| `order.updated` `{ userId, order }` | Só os sockets do dono do pedido | Move o pedido em cache para `confirmed`/`refused`; o diálogo do checkout mostra o recibo ou a recusa. Fora do checkout, um aviso informa o desfecho |
+
+- Todo evento traz `id` (único por emissão), `type`, `resource { type, id }`, `version` (versão do recurso após a mudança) e `occurredAt`. O cliente ignora um `id` repetido e qualquer `version` menor ou igual à que já conhece, seja de outro evento ou da resposta REST em cache, então duplicados e atrasados nunca regridem a tela.
+- O socket se autentica pelo `auth: { token }` do handshake, lido a cada (re)conexão. O servidor confere a sessão a cada entrega de `order.updated`: depois do logout, o token antigo não recebe mais nada. Ao trocar de usuário, o app refaz o handshake, e ainda descarta `order.updated` cujo `userId` não seja o da sessão atual.
+- Ao reconectar, o app refaz pelo REST as consultas de NFTs, do carrinho e dos pedidos em tela, para recuperar o que foi perdido enquanto esteve desconectado. Depois de 3 s sem conexão, um aviso informa que as atualizações em tempo real estão indisponíveis.
+- O `socket.io-client` é carregado sob demanda, depois do MSW: o `engine.io-client` guarda o `WebSocket` global quando o módulo é avaliado.
+- Controles do servidor simulado, usados pelos testes e úteis no DevTools (`window.kurioMock.realtime`):
+  - `updateNft(id, { price?, available? })` muda preço e/ou estoque e emite `nft.updated`.
+  - `updateNftSilently(id, …)` muda o mesmo sem emitir nada, como um evento perdido.
+  - `redeliver(eventId)` reenvia um evento já emitido; `deliver(event)` envia um evento arbitrário, como uma versão antiga atrasada.
+  - `disconnectAll()` derruba as conexões; `setOnline(false | true)` derruba e recusa novas conexões até voltar.
+  - `settleOrders()` responde agora os pedidos pendentes; `connections()` conta os sockets conectados.
+
+Exemplo: `kurioMock.realtime.updateNft('nft-1', { price: '1.47', available: { '1-50': 0 } })`.
 
 ### Variáveis de ambiente
 
@@ -71,7 +100,7 @@ Copie `.env.example` para `.env.local`:
 | Variável           | Padrão           | Descrição                             |
 | ------------------ | ---------------- | ------------------------------------- |
 | `VITE_API_URL`     | `/api`           | URL base da API REST usada pelo Axios |
-| `VITE_SOCKET_URL`  | origem da página | URL do servidor Socket.IO             |
+| `VITE_SOCKET_URL`  | origem da página | URL do servidor Socket.IO (simulado pelo MSW) |
 | `VITE_API_MOCKING` | `enabled`        | Use `disabled` para desligar o MSW    |
 
 ## Scripts
@@ -80,7 +109,7 @@ Copie `.env.example` para `.env.local`:
 | ---------------------- | --------------------------------------------------- |
 | `pnpm dev`             | Servidor de desenvolvimento em `:4317`              |
 | `pnpm build`           | Type-check + build de produção em `dist/`           |
-| `pnpm preview`         | Serve o build em `:4318` (com Socket.IO)            |
+| `pnpm preview`         | Serve o build em `:4318`                            |
 | `pnpm lint`            | Lint com oxlint                                     |
 | `pnpm typecheck`       | Type-check com `tsc -b`                             |
 | `pnpm test:e2e`        | Testes E2E e de regressão visual (desktop e mobile) |
@@ -105,13 +134,14 @@ Os testes sobem automaticamente `build + preview` na porta 4318. Screenshots de 
 ## Estrutura
 
 ```
-server/realtime.ts        Servidor Socket.IO acoplado ao Vite (dev e preview)
 src/
   main.tsx                QueryClient, Router e inicialização do MSW
   routes/                 Rotas do TanStack Router (a árvore é gerada em routeTree.gen.ts)
   lib/api/client.ts       Instância do Axios
-  lib/socket.ts           Cliente Socket.IO tipado
-  mocks/                  Worker e handlers do MSW
+  lib/socket.ts           Cliente Socket.IO tipado (carregado sob demanda)
+  lib/realtime/           Contrato dos eventos e aplicação deles no cache do TanStack Query
+  components/realtime/    Conexão do socket, reconciliação e avisos de tempo real
+  mocks/                  Worker e handlers do MSW (REST e Socket.IO)
   components/ui/          Componentes shadcn/ui
   components/devtools.tsx Devtools do TanStack (apenas em dev)
 e2e/                      Testes Playwright

@@ -30,11 +30,15 @@ import {
 import type { ApiErrorBody } from '@/lib/api/errors'
 import { compareEth, isEthAmount } from '@/lib/eth'
 import { shortenAddress } from '@/lib/format'
-import type { CheckoutRequest } from '@/lib/api/orders'
+import type { PlaceOrderRequest } from '@/lib/api/orders'
 import { cartItemSchema, cartPromoSchema, cartQuantitySchema, checkoutSchema, EMAIL_PATTERN, loginSchema, profileUpdateSchema, signupSchema, toFieldErrors, walletSchema } from '@/lib/validation'
 import { authenticate, collectorProfile, registerUser, sessionStore, toPublicUser, updateCollectorProfile, verifyCredentials } from './auth'
 import { cartStore } from './cart-store'
 import { featuredNfts, nftDetails, nfts, relatedNfts } from './data'
+// Applies the persisted live prices and supply to the fixtures before any handler reads them.
+import './market-store'
+import { ordersStore } from './orders-store'
+import { placeOrder, settleDueOrders } from './realtime'
 import { favoritesStore } from './favorites-store'
 import { conflict, notFound, serviceUnavailable, unauthenticated, validationError } from './http'
 import { isScenarioActive } from './scenarios'
@@ -43,11 +47,6 @@ import { readWallets, saveWallet, setWalletMirror, toCollectorWallet } from './w
 
 const API = import.meta.env.VITE_API_URL ?? '/api'
 const PAGE_SIZE = 9
-
-function transactionId() {
-  const bytes = crypto.getRandomValues(new Uint8Array(32))
-  return `0x${Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('')}`
-}
 
 const countBy = <K extends string>(ids: readonly { id: K }[], key: (nft: (typeof nfts)[number]) => K) =>
   Object.fromEntries(ids.map(({ id }) => [id, nfts.filter((nft) => key(nft) === id).length])) as Record<K, number>
@@ -98,7 +97,8 @@ function parseListParams(params: URLSearchParams) {
 export const handlers: RequestHandler[] = [
   http.get(`${API}/nfts/featured`, async () => {
     await delay(100)
-    return HttpResponse.json<FeaturedNftList>({ data: featuredNfts })
+    // Prices are live (they move with `nft.updated`); the rest of the featured entry is static.
+    return HttpResponse.json<FeaturedNftList>({ data: featuredNfts.map((nft) => ({ ...nft, price: nftDetails.get(nft.id)?.price ?? nft.price })) })
   }),
 
   http.get(`${API}/nfts/facets`, async () => {
@@ -275,13 +275,22 @@ export const handlers: RequestHandler[] = [
     return HttpResponse.json<Cart>(result.cart)
   }),
 
-  http.post<never, CheckoutRequest, Order | ApiErrorBody>(`${API}/orders`, async ({ request }) => {
+  http.post<never, PlaceOrderRequest, Order | ApiErrorBody>(`${API}/orders`, async ({ request }) => {
     await delay(500)
     const session = authenticate(request)
     if (!session) return unauthenticated('Entre para finalizar a compra.')
     if (isScenarioActive('checkout-error')) return serviceUnavailable()
-    const parsed = checkoutSchema.safeParse(await request.json().catch(() => ({})))
+    const body: unknown = await request.json().catch(() => ({}))
+    const parsed = checkoutSchema.safeParse(body)
     if (!parsed.success) return validationError(toFieldErrors(parsed.error), 'Verifique os dados informados.')
+
+    // The client sends the total it showed; if prices or supply moved since, the collector must review it first.
+    const expectedTotal = isRecord(body) ? body.expectedTotal : undefined
+    const current = cartStore.get()
+    if (current.itemCount === 0) return conflict('Seu carrinho está vazio.')
+    if (!isEthAmount(expectedTotal) || compareEth(expectedTotal, current.total) !== 0) {
+      return conflict('Os preços ou a disponibilidade mudaram. Revise o novo total antes de confirmar.')
+    }
 
     const taken = cartStore.take()
     if ('error' in taken) return conflict('Seu carrinho está vazio.')
@@ -289,10 +298,13 @@ export const handlers: RequestHandler[] = [
     const network = NETWORKS.find((item) => item.id === parsed.data.network)
     const wallet = WALLETS.find((item) => item.id === parsed.data.walletType)
     const { cart } = taken
-    return HttpResponse.json<Order>({
+    const now = new Date().toISOString()
+    const order: Order = {
       id: `KR-${crypto.randomUUID().slice(0, 8).toUpperCase()}`,
-      txId: transactionId(),
-      createdAt: new Date().toISOString(),
+      status: 'pending',
+      version: 1,
+      createdAt: now,
+      updatedAt: now,
       walletLabel: parsed.data.walletAddress.includes('.') ? parsed.data.walletAddress : shortenAddress(parsed.data.walletAddress),
       walletName: wallet?.label ?? 'Carteira',
       networkLabel: network?.label ?? 'Ethereum',
@@ -308,7 +320,24 @@ export const handlers: RequestHandler[] = [
       discount: cart.discount,
       networkFee: cart.networkFee,
       total: cart.total,
+    }
+    placeOrder({
+      userId: session.user.id,
+      order,
+      lines: cart.items.map(({ nftId, editionId, quantity }) => ({ nftId, editionId, quantity })),
+      promoCode: cart.promoCode,
     })
+    // 202: the wallet answer arrives later through `order.updated` (or `GET /orders/:id`).
+    return HttpResponse.json<Order>(order, { status: 202 })
+  }),
+
+  http.get<{ id: string }, never, Order | ApiErrorBody>(`${API}/orders/:id`, async ({ params, request }) => {
+    await delay(200)
+    const session = authenticate(request)
+    if (!session) return unauthenticated()
+    settleDueOrders()
+    const order = ordersStore.get(session.user.id, params.id)
+    return order ? HttpResponse.json<Order>(order) : notFound('Pedido não encontrado.')
   }),
 
   http.get<never, never, FavoriteList | ApiErrorBody>(`${API}/favorites`, async ({ request }) => {

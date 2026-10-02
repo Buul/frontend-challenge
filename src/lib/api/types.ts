@@ -173,11 +173,22 @@ export type OrderLine = {
   lineTotal: EthAmount
 }
 
-/** Receipt returned by `POST /orders` after the cart is cleared. */
+/**
+ * `pending` while the wallet signs and the network settles the transaction; then `confirmed` (with `txId`)
+ * or `refused` (with `failureReason`, and the items back in the cart). Settled orders never change again.
+ */
+export type OrderStatus = 'pending' | 'confirmed' | 'refused'
+
+/** Receipt snapshot taken by `POST /orders` from the cart; `status` moves on through `order.updated` events. */
 export type Order = {
   id: string
-  txId: string
+  status: OrderStatus
+  /** Monotonic; realtime events carrying an older version must be ignored. */
+  version: number
+  txId?: string
+  failureReason?: string
   createdAt: string
+  updatedAt: string
   walletLabel: string
   walletName: string
   networkLabel: string

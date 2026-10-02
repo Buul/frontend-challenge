@@ -209,7 +209,11 @@ export const sessionStore = {
 /** Resolves the bearer token of a request to its live session, or `undefined` when missing, unknown or expired. */
 export function authenticate(request: Request) {
   const token = /^Bearer (.+)$/.exec(request.headers.get('Authorization') ?? '')?.[1]
-  if (!token) return undefined
+  return token ? sessionForToken(token) : undefined
+}
+
+/** Resolves a token to its live session, or `undefined` when unknown or expired. Also used by the realtime handshake. */
+export function sessionForToken(token: string) {
   const session = sessions.read()[token]
   if (!session || Date.parse(session.expiresAt) <= Date.now()) {
     sessionStore.revoke(token)

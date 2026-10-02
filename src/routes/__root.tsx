@@ -4,6 +4,7 @@ import { lazy, Suspense } from 'react'
 import { AuthDialog } from '@/components/auth/auth-dialog'
 import { SessionSync } from '@/components/auth/session-sync'
 import { StatusPage } from '@/components/layout/status-page'
+import { RealtimeSync } from '@/components/realtime/realtime-sync'
 import { Button } from '@/components/ui/button'
 import { sessionQueryOptions } from '@/lib/api/auth'
 import { cartQueryOptions } from '@/lib/api/cart'
@@ -28,6 +29,7 @@ function RootLayout() {
     <>
       <Outlet />
       <SessionSync />
+      <RealtimeSync />
       <AuthDialog />
       <Suspense>
         <Devtools />

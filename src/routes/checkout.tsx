@@ -1,6 +1,6 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { createFileRoute, Link, useCanGoBack, useRouter } from '@tanstack/react-router'
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { CheckoutDesktop } from '@/components/checkout/checkout-desktop'
 import { CheckoutMobile } from '@/components/checkout/checkout-mobile'
 import { OrderDialog } from '@/components/checkout/order-dialog'
@@ -12,15 +12,23 @@ import { RetryAlert } from '@/components/ui/inline-alert'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useIsMobile } from '@/hooks/use-media-query'
 import { sessionKeys, useSession } from '@/lib/api/auth'
-import { cartQueryOptions } from '@/lib/api/cart'
+import { cartKeys, cartQueryOptions } from '@/lib/api/cart'
 import { ApiError, getErrorMessage } from '@/lib/api/errors'
-import type { CheckoutRequest } from '@/lib/api/orders'
-import { usePlaceOrder } from '@/lib/api/orders'
-import type { Order, SessionInfo, WalletId } from '@/lib/api/types'
+import { orderQueryOptions, usePlaceOrder, type CheckoutRequest } from '@/lib/api/orders'
+import type { SessionInfo, WalletId } from '@/lib/api/types'
+import { compareEth } from '@/lib/eth'
+import { formatEth } from '@/lib/format'
 import { useAuthDialog } from '@/lib/auth/auth-dialog'
 import { sessionToken } from '@/lib/auth/session-token'
 
+// Order ids look like `KR-1A2B3C4D`; anything else is ignored.
+const ORDER_ID = /^KR-[A-Z0-9]{8}$/
+
 export const Route = createFileRoute('/checkout')({
+  // The order in progress lives in the URL, so a refresh or a reconnection picks it up again.
+  validateSearch: (search: Record<string, unknown>): { order?: string } => ({
+    order: typeof search.order === 'string' && ORDER_ID.test(search.order) ? search.order : undefined,
+  }),
   loader: ({ context }) => {
     void context.queryClient.prefetchQuery(cartQueryOptions())
   },
@@ -31,16 +39,39 @@ function CheckoutPage() {
   const isMobile = useIsMobile()
   const router = useRouter()
   const canGoBack = useCanGoBack()
+  const navigate = Route.useNavigate()
+  const { order: orderId } = Route.useSearch()
   const queryClient = useQueryClient()
   const cart = useQuery(cartQueryOptions())
   const { user } = useSession()
   const placeOrder = usePlaceOrder()
+  const order = useQuery({ ...orderQueryOptions(user?.id ?? '', orderId ?? ''), enabled: Boolean(user && orderId) })
   const { open: openLogin } = useAuthDialog()
-  const [order, setOrder] = useState<Order>()
-  const [confirmed, setConfirmed] = useState(false)
   const [notice, setNotice] = useState<string>()
+  const confirmed = order.data?.status === 'confirmed'
 
   const onBack = () => (canGoBack ? router.history.back() : void router.navigate({ to: '/cart' }))
+  const closeOrder = () => void navigate({ search: (prev) => ({ ...prev, order: undefined }), replace: true })
+
+  // An order id that is not this user's (or no longer exists) is dropped from the URL.
+  useEffect(() => {
+    if (order.error instanceof ApiError && order.error.code === 'NOT_FOUND') {
+      setNotice('Pedido não encontrado.')
+      closeOrder()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- reacts to a new error only
+  }, [order.error])
+
+  // Prices and supply can change under the collector (via `nft.updated`): say so before they confirm.
+  const shownTotal = useRef<string | undefined>(undefined)
+  const total = cart.data?.total
+  useEffect(() => {
+    if (total === undefined) return
+    const previous = shownTotal.current
+    shownTotal.current = total
+    if (previous === undefined || placeOrder.isPending || orderId || cart.data?.itemCount === 0) return
+    if (compareEth(previous, total) !== 0) setNotice(`Os preços foram atualizados. O novo total é ${formatEth(total)}; revise antes de confirmar.`)
+  }, [total, placeOrder.isPending, orderId, cart.data?.itemCount])
 
   const place = async (input: CheckoutRequest) => {
     setNotice(undefined)
@@ -53,9 +84,18 @@ function CheckoutPage() {
       })
       return
     }
-    const placed = await placeOrder.mutateAsync(input)
-    setOrder(placed)
-    setConfirmed(true)
+    const expectedTotal = queryClient.getQueryData<{ total: string }>(cartKeys.current)?.total ?? '0'
+    try {
+      const placed = await placeOrder.mutateAsync({ ...input, expectedTotal })
+      void navigate({ search: (prev) => ({ ...prev, order: placed.id }), replace: true })
+    } catch (error) {
+      // Prices or supply moved since the page loaded: show the fresh cart and let the collector confirm again.
+      if (error instanceof ApiError && error.code === 'CONFLICT') {
+        await queryClient.invalidateQueries({ queryKey: cartKeys.current })
+        shownTotal.current = queryClient.getQueryData<{ total: string }>(cartKeys.current)?.total
+      }
+      throw error
+    }
   }
 
   const onSubmit = async (input: CheckoutRequest) => {
@@ -101,12 +141,12 @@ function CheckoutPage() {
   ) : cart.data.itemCount === 0 ? (
     empty
   ) : isMobile ? (
-    <CheckoutMobile cart={cart.data} pending={placeOrder.isPending} notice={notice} onBack={onBack} onConfirm={onConfirmWallet} />
+    <CheckoutMobile cart={cart.data} pending={placeOrder.isPending || order.data?.status === 'pending'} notice={notice} onBack={onBack} onConfirm={onConfirmWallet} />
   ) : (
-    <CheckoutDesktop user={user} cart={cart.data} pending={placeOrder.isPending} notice={notice} onSubmit={onSubmit} />
+    <CheckoutDesktop user={user} cart={cart.data} pending={placeOrder.isPending || order.data?.status === 'pending'} notice={notice} onSubmit={onSubmit} />
   )
 
-  const dialog = <OrderDialog order={order} onClose={() => setOrder(undefined)} />
+  const dialog = <OrderDialog order={orderId ? order.data : undefined} onClose={closeOrder} />
 
   if (isMobile) {
     return (
