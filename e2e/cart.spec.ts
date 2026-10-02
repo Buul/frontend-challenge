@@ -94,3 +94,22 @@ test('o carrinho do visitante passa para a conta ao entrar e cada conta vê só 
   await signInAt(page, '/cart', USERS.ana)
   await expect(page.getByRole('heading', { name: 'Sage Nomad #009' })).toBeVisible()
 })
+
+test('cupom aplicado pode ser removido e a remoção persiste', async ({ page }) => {
+  await page.goto('/nfts/nft-1?edition=open')
+  await buy(page).click()
+  await expect(page).toHaveURL(/\/cart$/)
+
+  await page.getByLabel('Código promocional').fill('KURIO10')
+  await page.getByRole('button', { name: 'Aplicar' }).click()
+  await expect(page.getByText('Cupom KURIO10 aplicado.')).toBeVisible()
+  await expect(page.getByText('(-) 0.119')).toBeVisible()
+
+  await page.getByRole('button', { name: 'Remover cupom' }).click()
+  await expect(page.getByRole('status').filter({ hasText: 'Cupom removido.' })).toBeVisible()
+  await expect(page.getByText('(-) 0.00')).toBeVisible()
+  await expect(page.getByText('Cupom KURIO10 aplicado.')).toHaveCount(0)
+
+  await page.reload()
+  await expect(page.getByText('(-) 0.00')).toBeVisible()
+})

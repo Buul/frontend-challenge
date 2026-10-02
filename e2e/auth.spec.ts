@@ -98,6 +98,20 @@ test('com o relógio adiantado além dos 30 min, a sessão expira sozinha e o lo
   expect(await page.evaluate(() => localStorage.getItem('kurio:session-token'))).toBeNull()
 })
 
+test('telas privadas levam o visitante ao login e voltam a elas, com a busca, depois de entrar', async ({ page }) => {
+  await page.goto('/profile')
+  await expect(page).toHaveURL(/^[^?]+\/\?auth=login&redirect=%2Fprofile$/)
+  await expect(page.getByRole('dialog')).toContainText('Entre para ver o seu perfil.')
+  await signIn(page, USERS.ana)
+  await expect(page).toHaveURL(/\/profile$/)
+  await expect(page.getByRole('heading', { name: 'Perfil do colecionador' })).toBeVisible()
+
+  await signOut(page, USERS.ana)
+  await page.goto('/checkout?order=KR-ABCDEF12')
+  await expect(page).toHaveURL(/\/cart\?auth=login&redirect=%2Fcheckout%3Forder%3DKR-ABCDEF12$/)
+  await expect(page.getByRole('dialog')).toContainText('Entre para finalizar a compra.')
+})
+
 test('link direto abre o login e redireciona só para caminhos internos', async ({ page }) => {
   await page.goto('/?auth=login&redirect=%2Fnfts%2Fnft-3')
   await signIn(page, USERS.bruno)

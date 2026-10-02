@@ -197,3 +197,26 @@ test('a newsletter confirma a inscrição', async ({ page }) => {
   await page.getByRole('button', { name: 'Enviar' }).click()
   await expect(page.getByText('Inscrição confirmada! Você vai receber as próximas novidades.')).toBeVisible()
 })
+
+test('no mobile os filtros abrem num drawer que prende o foco e o devolve ao fechar', async ({ page, isMobile }) => {
+  test.skip(!isMobile, 'O drawer de filtros é do layout mobile.')
+  await page.goto('/')
+  await expect(summary(page)).toHaveText('36 NFTs encontrados, página 1 de 4.')
+
+  const trigger = page.getByRole('button', { name: 'Filtros', exact: true })
+  await trigger.click()
+  const drawer = page.getByRole('dialog', { name: 'Filtros' })
+  await expect(drawer).toBeVisible()
+  await expect.poll(() => drawer.evaluate((node) => node.contains(document.activeElement))).toBe(true)
+  for (let stop = 0; stop < 12; stop++) {
+    await page.keyboard.press('Tab')
+    await expect.poll(() => drawer.evaluate((node) => node.contains(document.activeElement))).toBe(true)
+  }
+
+  await drawer.getByRole('button', { name: /^Arte digital/ }).click()
+  await expect(page).toHaveURL(/collection=digital-art/)
+  await page.keyboard.press('Escape')
+  await expect(drawer).toBeHidden()
+  await expect(page.getByRole('button', { name: 'Filtros, 1 ativo' })).toBeFocused()
+  await expect(summary(page)).toHaveText('4 NFTs encontrados, página 1 de 1.')
+})

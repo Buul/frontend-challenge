@@ -1,6 +1,6 @@
 import { expect, test, type Page } from '@playwright/test'
-import { signInAt, signOut, USERS } from './auth-helpers.ts'
-import { buyButton as buy, confirmButton, readyToConfirm, receiptHeading as receipt, statusMessage as toast } from './flows.ts'
+import { signIn, signInAt, signOut, USERS } from './auth-helpers.ts'
+import { buyButton as buy, confirmButton, fillCollectorProfile, readyToConfirm, receiptHeading as receipt, statusMessage as toast } from './flows.ts'
 import { mockStorage, realtime } from './mock-helpers.ts'
 
 /** Payment ready to confirm (see `readyToConfirm`), with the realtime connection up. */
@@ -122,6 +122,31 @@ test.describe('conexão', () => {
 })
 
 test.describe('checkout', () => {
+  test('edição que esgota durante o pagamento sai do pedido e a compra não pode ser confirmada', async ({ page }) => {
+    await openCheckout(page)
+
+    await realtime(page).updateNft('nft-1', { available: { open: 0 } })
+    await expect(toast(page, 'Emerald Ape #042 (edição ABERTA) esgotou e saiu do carrinho.')).toBeVisible()
+    await expect(page.getByText('Seu carrinho está vazio')).toBeVisible()
+    await expect(confirmButton(page)).toHaveCount(0)
+  })
+
+  test('estoque que cai abaixo da quantidade ajusta o pedido e avisa antes de confirmar', async ({ page }) => {
+    await page.goto('/nfts/nft-2?edition=1-50&auth=login')
+    await signIn(page, USERS.ana)
+    await page.getByRole('button', { name: 'Aumentar quantidade' }).click()
+    await expect(page.getByRole('group', { name: 'Quantidade' }).locator('output')).toHaveText('2')
+    await buy(page).click()
+    await page.getByRole('button', { name: 'Finalizar', exact: true }).click()
+    await fillCollectorProfile(page)
+    await realtime(page).connected()
+
+    await realtime(page).updateNft('nft-2', { available: { '1-50': 1 } })
+    await expect(toast(page, 'A quantidade de Sage Nomad #009 no carrinho foi ajustada ao estoque disponível.')).toBeVisible()
+    // 1 × 1.69 ETH + 0.016 ETH network fee.
+    await expect(page.getByText('Os preços foram atualizados. O novo total é 1.706 ETH; revise antes de confirmar.')).toBeVisible()
+  })
+
   test('preço que muda durante o pagamento é avisado e a compra sai pelo novo total', async ({ page }) => {
     await openCheckout(page)
 
@@ -133,17 +158,24 @@ test.describe('checkout', () => {
     await expect(page.getByRole('dialog').getByText('1.486 ETH').first()).toBeVisible()
   })
 
-  test('o servidor recusa um total desatualizado e a confirmação seguinte usa o total novo', async ({ page }) => {
+  test('a cotação revalidada antes de confirmar barra um total desatualizado e a confirmação seguinte usa o novo', async ({ page }) => {
     await openCheckout(page)
+    const orderPosts: string[] = []
+    page.on('request', (request) => {
+      if (request.method() === 'POST' && request.url().endsWith('/api/orders')) orderPosts.push(request.url())
+    })
 
-    // The event is lost: only the server knows the price moved.
+    // The event is lost: only the server knows the price moved, and GET /cart/quote tells the page before it orders.
     await realtime(page).updateNftSilently('nft-1', { price: '1.47' })
     await confirm(page)
     await expect(page.getByText('Os preços ou a disponibilidade mudaram. Revise o novo total antes de confirmar.')).toBeVisible()
+    await expect(page.getByText('1.486 ETH').first()).toBeVisible()
     await expect(page.getByRole('dialog')).toHaveCount(0)
+    expect(orderPosts).toHaveLength(0)
 
     await confirm(page)
     await expect(receipt(page)).toBeVisible()
+    expect(orderPosts).toHaveLength(1)
   })
 })
 
