@@ -163,7 +163,8 @@ function Home() {
               onPageChange={(page) => update({ page: page === 1 ? undefined : page }, false)}
               onRetry={() => void list.refetch()}
               onClearFilters={() => update(CLEARED_FILTERS)}
-              onFavoriteFeedback={isMobile ? showToast : undefined}
+              layout={isMobile ? 'mobile' : 'desktop'}
+              onCardFeedback={showToast}
             />
           </div>
         </div>
@@ -172,12 +173,8 @@ function Home() {
         <Blog />
       </main>
       <SiteFooter className="mt-16" />
-      {isMobile && (
-        <>
-          <StatusToast toast={toast} style={{ bottom: MOBILE_TAB_BAR_HEIGHT + 8 }} />
-          <MobileTabBar />
-        </>
-      )}
+      <StatusToast toast={toast} style={{ bottom: isMobile ? MOBILE_TAB_BAR_HEIGHT + 8 : 24 }} />
+      {isMobile && <MobileTabBar />}
     </PageShell>
   )
 }

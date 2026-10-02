@@ -1,6 +1,7 @@
 import { Link } from '@tanstack/react-router'
 import arrowDown from '@/assets/figma/arrow-down.svg'
 import arrowRight2 from '@/assets/figma/arrow-right-2.svg'
+import { CardActions } from '@/components/home/card-actions'
 import { FavoriteButton } from '@/components/nft/favorite-button'
 import { useFavoriteToggle } from '@/components/nft/use-favorite-toggle'
 import { InlineAlert, RetryAlert } from '@/components/ui/inline-alert'
@@ -21,8 +22,10 @@ type NftGridProps = {
   onPageChange: (page: number) => void
   onRetry: () => void
   onClearFilters: () => void
-  /** Shows the favorite heart on each card (mobile design only) and receives the toggle result. */
-  onFavoriteFeedback?: (message: string) => void
+  /** Mobile design: a favorite heart on each card. Desktop design: cart, favorite and detail actions on hover. */
+  layout: 'mobile' | 'desktop'
+  /** Receives the outcome of a card action (favorite, add to cart) to announce it. */
+  onCardFeedback: (message: string) => void
 }
 
 function CardFavoriteButton({ nft, onFeedback }: { nft: Nft; onFeedback: (message: string) => void }) {
@@ -30,7 +33,7 @@ function CardFavoriteButton({ nft, onFeedback }: { nft: Nft; onFeedback: (messag
   return <FavoriteButton variant="card" control={favorite} label={`Favoritar ${nft.name}`} />
 }
 
-function NftCard({ nft, onFavoriteFeedback }: { nft: Nft; onFavoriteFeedback?: (message: string) => void }) {
+function NftCard({ nft, layout, onFeedback }: { nft: Nft; layout: 'mobile' | 'desktop'; onFeedback: (message: string) => void }) {
   return (
     <article className="group relative flex flex-col gap-2 md:gap-3">
       <div className="relative flex aspect-[175/200] items-center justify-center overflow-hidden rounded-[20px] bg-[linear-gradient(139.5deg,var(--card)_12%,var(--surface-raised)_106.6%)] px-1 md:aspect-auto md:h-[300px] md:rounded-none md:bg-card md:bg-none">
@@ -43,7 +46,7 @@ function NftCard({ nft, onFavoriteFeedback }: { nft: Nft; onFavoriteFeedback?: (
             loading="lazy"
             className="aspect-square w-full rounded-2xl object-cover transition-transform duration-300 group-hover:scale-[1.02] motion-reduce:transition-none md:rounded-[15px]"
           />
-          {onFavoriteFeedback && <CardFavoriteButton nft={nft} onFeedback={onFavoriteFeedback} />}
+          {layout === 'mobile' ? <CardFavoriteButton nft={nft} onFeedback={onFeedback} /> : <CardActions nft={nft} onFeedback={onFeedback} />}
         </div>
         {nft.isRare && (
           <span className="absolute top-4 left-0 flex h-8 w-[68px] items-center bg-primary px-2 text-[13px] leading-4 font-medium text-primary-foreground">
@@ -150,7 +153,8 @@ export function NftGrid({
   onPageChange,
   onRetry,
   onClearFilters,
-  onFavoriteFeedback,
+  layout,
+  onCardFeedback,
 }: NftGridProps) {
   return (
     <section id="mercado" aria-labelledby="market-title" className="flex min-w-0 flex-1 flex-col gap-10 md:gap-[88px]">
@@ -206,7 +210,7 @@ export function NftGrid({
               isFetching && result && 'opacity-60 transition-opacity',
             )}
           >
-            {result ? result.data.map((nft) => <NftCard key={nft.id} nft={nft} onFavoriteFeedback={onFavoriteFeedback} />) : Array.from({ length: 9 }, (_, i) => <CardSkeleton key={i} />)}
+            {result ? result.data.map((nft) => <NftCard key={nft.id} nft={nft} layout={layout} onFeedback={onCardFeedback} />) : Array.from({ length: 9 }, (_, i) => <CardSkeleton key={i} />)}
           </div>
         )}
       </div>

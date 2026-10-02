@@ -15,4 +15,4 @@ export function CountBadge({ count, className }: { count: number; className?: st
   )
 }
 
-export const cartLabel = (count: number) => (count > 0 ? `Carrinho, ${count} itens` : 'Carrinho vazio')
+export const cartLabel = (count: number) => (count > 0 ? `Carrinho, ${count} ${count === 1 ? 'item' : 'itens'}` : 'Carrinho vazio')
