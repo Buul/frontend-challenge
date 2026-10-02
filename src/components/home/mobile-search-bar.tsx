@@ -35,7 +35,7 @@ export function MobileSearchBar({ activeFilters, filters }: MobileSearchBarProps
 
       <Sheet>
         <SheetTrigger
-          aria-label={activeFilters > 0 ? `Filtros, ${activeFilters} ativos` : 'Filtros'}
+          aria-label={activeFilters > 0 ? `Filtros, ${activeFilters} ${activeFilters === 1 ? 'ativo' : 'ativos'}` : 'Filtros'}
           className="relative grid size-[45px] shrink-0 place-items-center rounded-[14px] bg-[linear-gradient(137deg,color-mix(in_srgb,var(--primary)_45%,transparent)_24.6%,var(--primary)_100%)]"
         >
           <span className="grid size-[22px] place-items-center">
