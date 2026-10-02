@@ -9,6 +9,7 @@ import { PageShell } from '@/components/layout/page-shell'
 import { SiteFooter } from '@/components/layout/site-footer'
 import { SiteHeader } from '@/components/layout/site-header'
 import { SkipLink } from '@/components/layout/skip-link'
+import { BackButton } from '@/components/ui/back-button'
 import { RetryAlert } from '@/components/ui/inline-alert'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useIsMobile } from '@/hooks/use-media-query'
@@ -201,9 +202,10 @@ function CheckoutDesktopSkeleton() {
 
 function CheckoutMobileSkeleton({ onBack }: { onBack: () => void }) {
   return (
-    <div aria-hidden className="flex flex-col gap-3 px-7 pt-8">
+    <div className="flex flex-col gap-3 px-7 pt-8">
+      {/* Going back works while the payment loads; only the placeholders are hidden from assistive tech. */}
       <div className="flex h-11 items-center">
-        <button type="button" aria-label="Voltar" onClick={onBack} className="size-[35px] rounded-full bg-surface-raised" />
+        <BackButton onClick={onBack} />
       </div>
       <Skeleton className="h-[93px] w-full rounded-[14px]" />
       <Skeleton className="h-[93px] w-full rounded-[14px]" />

@@ -1,7 +1,7 @@
 import { Link } from '@tanstack/react-router'
-import arrowBack from '@/assets/figma/arrow-back.svg'
 import deleteIcon from '@/assets/figma/delete.svg'
 import { CartSummary } from '@/components/cart/cart-summary'
+import { BackButton } from '@/components/ui/back-button'
 import { QuantityStepper } from '@/components/nft/quantity-stepper'
 import type { Cart, CartItem } from '@/lib/api/types'
 import { formatEth } from '@/lib/format'
@@ -58,11 +58,7 @@ export function CartMobile({ cart, pending, signedIn, notice, onBack, onQuantity
     <div className="flex min-h-dvh flex-col">
       <div className="flex flex-col gap-3 px-7 pt-8">
         <header className="relative flex h-11 items-center">
-          <button type="button" aria-label="Voltar" onClick={onBack} className="grid size-[35px] place-items-center rounded-full border border-border bg-surface-raised">
-            <span className="grid size-5 place-items-center">
-              <img src={arrowBack} alt="" width={13.17} height={7.33} className="rotate-90" />
-            </span>
-          </button>
+          <BackButton onClick={onBack} />
           <h1 className="pointer-events-none absolute inset-x-0 text-center text-xl leading-4 font-bold">Carrinho de NFTs</h1>
         </header>
 

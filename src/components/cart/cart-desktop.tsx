@@ -1,6 +1,7 @@
 import { Link } from '@tanstack/react-router'
 import deleteIcon from '@/assets/figma/delete.svg'
 import { CartSummary } from '@/components/cart/cart-summary'
+import { Breadcrumb } from '@/components/layout/breadcrumb'
 import { QuantityStepper } from '@/components/nft/quantity-stepper'
 import type { Cart, CartItem } from '@/lib/api/types'
 import { formatEth } from '@/lib/format'
@@ -8,28 +9,6 @@ import { cn } from '@/lib/utils'
 
 // Header and rows are separate grids, so the tracks must not depend on content (`auto`) or they drift apart.
 const CART_COLUMNS = 'grid-cols-[minmax(0,2.3fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_24px]'
-
-export function CartBreadcrumb() {
-  return (
-    <nav aria-label="Você está em">
-      <ol className="flex flex-wrap gap-[1ch] text-[15px] leading-4 font-bold">
-        <li>
-          <Link to="/" className="rounded-sm hover:text-brand">
-            Início
-          </Link>
-        </li>
-        <li aria-hidden>/</li>
-        <li>
-          <Link to="/" hash="mercado" className="rounded-sm hover:text-brand">
-            Mercado
-          </Link>
-        </li>
-        <li aria-hidden>/</li>
-        <li>Carrinho</li>
-      </ol>
-    </nav>
-  )
-}
 
 function RemoveButton({ name, onRemove }: { name: string; onRemove: () => void }) {
   return (
@@ -82,7 +61,7 @@ export function CartDesktop({ cart, pending, signedIn, notice, onQuantity, onRem
   return (
     <div className="flex flex-col gap-3">
       <h1 className="sr-only">Carrinho de NFTs</h1>
-      <CartBreadcrumb />
+      <Breadcrumb current="Carrinho" />
       <div className="flex flex-col gap-8 lg:flex-row lg:items-start lg:justify-between">
         <div className="flex min-w-0 flex-1 flex-col gap-3 lg:max-w-[782px]">
           <div className={cn('grid items-center gap-4 pr-6', CART_COLUMNS)}>

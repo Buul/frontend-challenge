@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react'
-import arrowBack from '@/assets/figma/arrow-back.svg'
 import shopIcon from '@/assets/figma/shop.svg'
 import starIcon from '@/assets/figma/star-amber.svg'
+import { BackButton } from '@/components/ui/back-button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useSnapCarousel } from '@/hooks/use-snap-carousel'
 import type { NftDetail, NftImage } from '@/lib/api/types'
@@ -17,8 +17,6 @@ import type { Purchase } from './use-purchase'
 
 /** Space reserved below the page so the fixed buy bar never covers content. */
 export const MOBILE_BUY_BAR_HEIGHT = 188
-
-const circleButton = 'grid size-[35px] place-items-center rounded-full border border-border bg-surface-raised'
 
 function Gallery({ images }: { images: NftImage[] }) {
   const { ref, page, pages, scrollToPage } = useSnapCarousel<HTMLUListElement>(images.length)
@@ -72,11 +70,7 @@ function Hero({ onBack, favorite, children }: { onBack: () => void; favorite?: F
   return (
     <div className="flex h-[506px] flex-col gap-2 bg-[linear-gradient(137.64deg,var(--card)_12%,var(--surface-raised)_106.59%)] px-7 pt-[23px]">
       <div className="flex items-center justify-between">
-        <button type="button" aria-label="Voltar" onClick={onBack} className={circleButton}>
-          <span className="grid size-5 place-items-center">
-            <img src={arrowBack} alt="" width={13.17} height={7.33} className="rotate-90" />
-          </span>
-        </button>
+        <BackButton onClick={onBack} />
         {favorite && <FavoriteButton variant="circle" control={favorite} />}
       </div>
       {children}

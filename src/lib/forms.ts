@@ -41,3 +41,18 @@ export function setServerErrors<TField extends string>(form: AnyFormApi, order: 
 /** First field with an error, in `order`; used to move focus there after a failed submit. */
 export const firstInvalidField = <TField extends string>(form: AnyFormApi, order: readonly TField[]) =>
   order.find((field) => (form.getFieldMeta(field)?.errors.length ?? 0) > 0)
+
+/** A TanStack Form text field, as seen by `fieldProps`. */
+type BoundField = {
+  state: { value: string; meta: { errors: readonly unknown[] } }
+  handleBlur: () => void
+  handleChange: (value: string) => void
+}
+
+/** Value, first error and handlers of a form field, in the shape the shared fields (`@/components/ui/form-field`) take. */
+export const fieldProps = (field: BoundField) => ({
+  value: field.state.value,
+  error: fieldError(field.state.meta.errors),
+  onBlur: field.handleBlur,
+  onChange: field.handleChange,
+})

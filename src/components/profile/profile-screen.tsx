@@ -1,19 +1,18 @@
 import { useForm } from '@tanstack/react-form'
 import { useNavigate } from '@tanstack/react-router'
-import { useRef, useState, type ChangeEvent, type ReactNode } from 'react'
-import hideIcon from '@/assets/figma/profile-hide.svg'
+import { useRef, useState, type ChangeEvent } from 'react'
 import imageIcon from '@/assets/figma/profile-image.svg'
-import arrowIcon from '@/assets/figma/profile-arrow.svg'
+import { SignInRequired } from '@/components/auth/sign-in-required'
 import { AccountSidebar } from '@/components/profile/account-sidebar'
-import { InlineAlert, RetryAlert } from '@/components/ui/inline-alert'
+import { EnsField, PasswordField, TextField } from '@/components/ui/form-field'
+import { RetryAlert } from '@/components/ui/inline-alert'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useLogout, useSession } from '@/lib/api/auth'
 import { ApiError, getErrorMessage } from '@/lib/api/errors'
 import { useCollectorProfile, useUpdateAvatar, useUpdateProfile } from '@/lib/api/profile'
-import { ENS_SUFFIXES, type CollectorProfile, type EnsSuffix } from '@/lib/api/types'
-import { authIntent } from '@/lib/auth/auth-dialog'
+import type { CollectorProfile, EnsSuffix } from '@/lib/api/types'
 import { toSquareDataUrl } from '@/lib/image'
-import { fieldError, firstInvalidField, formErrorMessage, handleAuthSubmit, setServerErrors } from '@/lib/forms'
+import { fieldProps, firstInvalidField, formErrorMessage, handleAuthSubmit, setServerErrors } from '@/lib/forms'
 import { cn } from '@/lib/utils'
 import { AVATAR_MAX_BYTES, AVATAR_TYPES, profileFormSchema } from '@/lib/validation'
 
@@ -43,15 +42,12 @@ type ProfileValues = {
   confirmPassword: string
 }
 
-const controlClass =
-  'h-10 w-full rounded-[3px] border border-border bg-transparent px-3 text-[15px] leading-[15px] text-foreground outline-none focus-visible:border-primary aria-invalid:border-coral'
-
 export function ProfileScreen() {
   const { user, isPending } = useSession()
   const profile = useCollectorProfile(user?.id)
 
   if (isPending || (user && profile.isPending)) return <ProfileSkeleton />
-  if (!user) return <SignedOut />
+  if (!user) return <SignInRequired message="Entre para ver e editar os dados do seu perfil." notice="Entre para ver o seu perfil." path="/profile" />
   if (!profile.data) {
     return (
       <RetryAlert
@@ -167,112 +163,41 @@ function ProfileEditor({ userId, profile }: { userId: string; profile: Collector
         <div className="flex flex-col gap-6">
           <div className="flex flex-col gap-6 min-[1440px]:flex-row min-[1440px]:justify-between min-[1440px]:gap-0">
             <form.Field name="displayName">
-              {(field) => (
-                <TextField
-                  id="profile-display-name"
-                  label="Nome de exibição"
-                  required
-                  autoComplete="nickname"
-                  fieldRef={bind('displayName')}
-                  value={field.state.value}
-                  error={fieldError(field.state.meta.errors)}
-                  onBlur={field.handleBlur}
-                  onChange={field.handleChange}
-                />
-              )}
+              {(field) => <TextField id="profile-display-name" label="Nome de exibição" required autoComplete="nickname" inputRef={bind('displayName')} {...fieldProps(field)} />}
             </form.Field>
             <form.Field name="username">
-              {(field) => (
-                <TextField
-                  id="profile-username"
-                  label="Nome de usuário"
-                  required
-                  autoComplete="username"
-                  fieldRef={bind('username')}
-                  value={field.state.value}
-                  error={fieldError(field.state.meta.errors)}
-                  onBlur={field.handleBlur}
-                  onChange={field.handleChange}
-                />
-              )}
+              {(field) => <TextField id="profile-username" label="Nome de usuário" required autoComplete="username" inputRef={bind('username')} {...fieldProps(field)} />}
             </form.Field>
           </div>
           <div className="flex flex-col gap-6 min-[1440px]:flex-row min-[1440px]:justify-between min-[1440px]:gap-0">
             <form.Field name="email">
               {(field) => (
-                <TextField
-                  id="profile-email"
-                  label="E-mail"
-                  required
-                  type="email"
-                  inputMode="email"
-                  autoComplete="email"
-                  fieldRef={bind('email')}
-                  value={field.state.value}
-                  error={fieldError(field.state.meta.errors)}
-                  onBlur={field.handleBlur}
-                  onChange={field.handleChange}
-                />
+                <TextField id="profile-email" label="E-mail" required type="email" inputMode="email" autoComplete="email" inputRef={bind('email')} {...fieldProps(field)} />
               )}
             </form.Field>
             <form.Field name="ensName">
-              {(field) => (
-                <Field label="Nome ENS" required error={fieldError(field.state.meta.errors)} htmlFor="profile-ens">
-                  <div className="flex w-full max-w-[417px] gap-2.5">
-                    <form.Field name="ensSuffix">
-                      {(suffix) => (
-                        <div className="relative w-[78px] shrink-0">
-                          <select
-                            ref={bind('ensSuffix')}
-                            aria-label="Sufixo do nome ENS"
-                            value={suffix.state.value}
-                            onBlur={suffix.handleBlur}
-                            onChange={(event) => suffix.handleChange(event.target.value)}
-                            className={cn(controlClass, 'appearance-none pr-8 pl-2.5')}
-                          >
-                            {ENS_SUFFIXES.map((item) => (
-                              <option key={item.id} value={item.id}>
-                                {item.label}
-                              </option>
-                            ))}
-                          </select>
-                          <img src={arrowIcon} alt="" width={20} height={20} className="pointer-events-none absolute top-1/2 right-1.5 -translate-y-1/2" />
-                        </div>
-                      )}
-                    </form.Field>
-                    <input
-                      ref={bind('ensName')}
+              {(name) => (
+                <form.Field name="ensSuffix">
+                  {(suffix) => (
+                    <EnsField
                       id="profile-ens"
-                      value={field.state.value}
-                      onBlur={field.handleBlur}
-                      onChange={(event) => field.handleChange(event.target.value)}
-                      autoComplete="off"
-                      spellCheck={false}
-                      aria-invalid={Boolean(fieldError(field.state.meta.errors)) || undefined}
-                      className={cn(controlClass, 'min-w-0 flex-1')}
+                      required
+                      name={{ ...fieldProps(name), inputRef: bind('ensName') }}
+                      suffix={{ ...fieldProps(suffix), selectRef: bind('ensSuffix') }}
                     />
-                  </div>
-                </Field>
+                  )}
+                </form.Field>
               )}
             </form.Field>
           </div>
           <div className="flex flex-col gap-6 min-[1440px]:flex-row min-[1440px]:justify-between min-[1440px]:gap-0">
             <form.Field name="walletNickname">
-              {(field) => (
-                <TextField
-                  id="profile-wallet"
-                  label="Apelido da carteira"
-                  required
-                  autoComplete="off"
-                  fieldRef={bind('walletNickname')}
-                  value={field.state.value}
-                  error={fieldError(field.state.meta.errors)}
-                  onBlur={field.handleBlur}
-                  onChange={field.handleChange}
-                />
-              )}
+              {(field) => <TextField id="profile-wallet" label="Apelido da carteira" required autoComplete="off" inputRef={bind('walletNickname')} {...fieldProps(field)} />}
             </form.Field>
-            <Field label="Avatar">
+            <div role="group" aria-labelledby="profile-avatar-label" className="flex w-full max-w-[417px] shrink-0 flex-col gap-2.5">
+              <span id="profile-avatar-label" className="text-[15px] leading-[15px]">
+                Avatar
+              </span>
               <div className="flex flex-col gap-2">
                 <div className="flex items-center gap-6" aria-busy={updateAvatar.isPending}>
                   <span
@@ -325,53 +250,20 @@ function ProfileEditor({ userId, profile }: { userId: string; profile: Collector
                   {avatarStatus?.message}
                 </p>
               </div>
-            </Field>
+            </div>
           </div>
         </div>
 
         <div className="flex flex-col gap-6">
           <h2 className="text-base leading-4 font-medium">Alterar senha</h2>
           <form.Field name="currentPassword">
-            {(field) => (
-              <SecretField
-                id="profile-current-password"
-                label="Senha atual"
-                autoComplete="current-password"
-                fieldRef={bind('currentPassword')}
-                value={field.state.value}
-                error={fieldError(field.state.meta.errors)}
-                onBlur={field.handleBlur}
-                onChange={field.handleChange}
-              />
-            )}
+            {(field) => <PasswordField id="profile-current-password" label="Senha atual" autoComplete="current-password" inputRef={bind('currentPassword')} {...fieldProps(field)} />}
           </form.Field>
           <form.Field name="newPassword">
-            {(field) => (
-              <SecretField
-                id="profile-new-password"
-                label="Nova senha"
-                autoComplete="new-password"
-                fieldRef={bind('newPassword')}
-                value={field.state.value}
-                error={fieldError(field.state.meta.errors)}
-                onBlur={field.handleBlur}
-                onChange={field.handleChange}
-              />
-            )}
+            {(field) => <PasswordField id="profile-new-password" label="Nova senha" autoComplete="new-password" inputRef={bind('newPassword')} {...fieldProps(field)} />}
           </form.Field>
           <form.Field name="confirmPassword">
-            {(field) => (
-              <SecretField
-                id="profile-confirm-password"
-                label="Confirmar nova senha"
-                autoComplete="new-password"
-                fieldRef={bind('confirmPassword')}
-                value={field.state.value}
-                error={fieldError(field.state.meta.errors)}
-                onBlur={field.handleBlur}
-                onChange={field.handleChange}
-              />
-            )}
+            {(field) => <PasswordField id="profile-confirm-password" label="Confirmar nova senha" autoComplete="new-password" inputRef={bind('confirmPassword')} {...fieldProps(field)} />}
           </form.Field>
         </div>
 
@@ -397,144 +289,6 @@ function ProfileEditor({ userId, profile }: { userId: string; profile: Collector
   )
 }
 
-function Field({
-  label,
-  required,
-  error,
-  htmlFor,
-  children,
-}: {
-  label: string
-  required?: boolean
-  error?: string
-  htmlFor?: string
-  children: ReactNode
-}) {
-  return (
-    <div className="flex w-full max-w-[417px] shrink-0 flex-col gap-2.5">
-      <label htmlFor={htmlFor} className="flex items-center text-[15px] leading-[15px]">
-        {label}
-        {required && (
-          <span aria-hidden className="text-[22px] leading-[29px] text-coral">
-            *
-          </span>
-        )}
-      </label>
-      {children}
-      {error && <p className="text-[13px] leading-4 text-coral">{error}</p>}
-    </div>
-  )
-}
-
-function TextField({
-  id,
-  label,
-  required,
-  type = 'text',
-  inputMode,
-  autoComplete,
-  value,
-  error,
-  fieldRef,
-  onBlur,
-  onChange,
-}: {
-  id: string
-  label: string
-  required?: boolean
-  type?: 'text' | 'email'
-  inputMode?: 'email'
-  autoComplete?: string
-  value: string
-  error?: string
-  fieldRef: (node: HTMLInputElement | null) => void
-  onBlur: () => void
-  onChange: (value: string) => void
-}) {
-  return (
-    <Field label={label} required={required} error={error} htmlFor={id}>
-      <input
-        ref={fieldRef}
-        id={id}
-        type={type}
-        inputMode={inputMode}
-        autoComplete={autoComplete}
-        value={value}
-        onBlur={onBlur}
-        onChange={(event) => onChange(event.target.value)}
-        aria-invalid={Boolean(error) || undefined}
-        className={controlClass}
-      />
-    </Field>
-  )
-}
-
-function SecretField({
-  id,
-  label,
-  autoComplete,
-  value,
-  error,
-  fieldRef,
-  onBlur,
-  onChange,
-}: {
-  id: string
-  label: string
-  autoComplete: string
-  value: string
-  error?: string
-  fieldRef: (node: HTMLInputElement | null) => void
-  onBlur: () => void
-  onChange: (value: string) => void
-}) {
-  const [revealed, setRevealed] = useState(false)
-  return (
-    <div className="flex w-full max-w-[417px] flex-col gap-3">
-      <label htmlFor={id} className="text-[15px] leading-[15px]">
-        {label}
-      </label>
-      <div className="relative">
-        <input
-          ref={fieldRef}
-          id={id}
-          type={revealed ? 'text' : 'password'}
-          autoComplete={autoComplete}
-          value={value}
-          onBlur={onBlur}
-          onChange={(event) => onChange(event.target.value)}
-          aria-invalid={Boolean(error) || undefined}
-          className={cn(controlClass, 'pr-12')}
-        />
-        <button
-          type="button"
-          onClick={() => setRevealed((current) => !current)}
-          aria-label={revealed ? `Ocultar ${label.toLowerCase()}` : `Mostrar ${label.toLowerCase()}`}
-          className="absolute top-1/2 right-4 -translate-y-1/2"
-        >
-          <img src={hideIcon} alt="" width={16.6667} height={14.3942} />
-        </button>
-      </div>
-      {error && <p className="text-[13px] leading-4 text-coral">{error}</p>}
-    </div>
-  )
-}
-
-function SignedOut() {
-  const navigate = useNavigate()
-  return (
-    <InlineAlert
-      message="Entre para ver e editar os dados do seu perfil."
-      action={{
-        label: 'Entrar',
-        onClick: () => {
-          authIntent.set({ notice: 'Entre para ver o seu perfil.' })
-          void navigate({ to: '/profile', search: { auth: 'login', redirect: '/profile' } })
-        },
-      }}
-    />
-  )
-}
 
 function ProfileSkeleton() {
   return (

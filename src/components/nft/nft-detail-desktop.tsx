@@ -1,4 +1,3 @@
-import { Link } from '@tanstack/react-router'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import type { NftDetail } from '@/lib/api/types'
@@ -12,26 +11,6 @@ import { QuantityStepper } from './quantity-stepper'
 import { RatingStars } from './rating-stars'
 import { ShareLinks } from './share-links'
 import type { Purchase } from './use-purchase'
-
-export function Breadcrumb() {
-  return (
-    <nav aria-label="Você está em">
-      <ol className="flex gap-[1ch] text-[15px] leading-4 font-bold">
-        <li>
-          <Link to="/" className="rounded-sm hover:text-brand">
-            Início
-          </Link>
-        </li>
-        <li aria-hidden>/</li>
-        <li>
-          <Link to="/" hash="mercado" className="rounded-sm hover:text-brand">
-            Mercado
-          </Link>
-        </li>
-      </ol>
-    </nav>
-  )
-}
 
 export function TokenFacts({ nft }: { nft: NftDetail }) {
   const facts = [

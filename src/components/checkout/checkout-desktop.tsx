@@ -1,13 +1,14 @@
 import { useForm } from '@tanstack/react-form'
 import { Link } from '@tanstack/react-router'
-import { useRef, type ReactNode } from 'react'
-import arrowDown from '@/assets/figma/arrow-down.svg'
+import { useRef } from 'react'
 import radioRing from '@/assets/figma/radio-ring.svg'
 import { RadioMark } from '@/components/checkout/radio-mark'
+import { Breadcrumb } from '@/components/layout/breadcrumb'
+import { controlClass, EnsField, errorIdFor, SelectField, TextField } from '@/components/ui/form-field'
 import type { CheckoutRequest } from '@/lib/api/orders'
 import { ApiError } from '@/lib/api/errors'
-import { ENS_SUFFIXES, NETWORKS, WALLETS, type Cart, type User } from '@/lib/api/types'
-import { fieldError, firstInvalidField, setServerErrors } from '@/lib/forms'
+import { NETWORKS, WALLETS, type Cart, type User } from '@/lib/api/types'
+import { fieldError, fieldProps, firstInvalidField, setServerErrors } from '@/lib/forms'
 import { formatDiscount, formatEth } from '@/lib/format'
 import { cn } from '@/lib/utils'
 import { checkoutSchema } from '@/lib/validation'
@@ -43,58 +44,6 @@ type CheckoutValues = {
   ensSuffix: string
   useOtherWallet: boolean
   notes: string
-}
-
-const controlClass =
-  'h-10 w-full rounded-[3px] border border-border bg-transparent px-3 text-sm leading-4 text-foreground outline-none placeholder:text-sm placeholder:text-tertiary focus-visible:border-primary aria-invalid:border-coral'
-
-function Field({ id, label, required, error, children }: { id?: string; label?: string; required?: boolean; error?: string; children: ReactNode }) {
-  return (
-    <div className="flex flex-col gap-3">
-      {label ? (
-        <label htmlFor={id} className="text-[15px] leading-[22px]">
-          {label}
-          {required && (
-            <span aria-hidden className="text-[22px] leading-none text-coral">
-              *
-            </span>
-          )}
-        </label>
-      ) : (
-        <span aria-hidden className="hidden leading-[22px] sm:block">
-          &nbsp;
-        </span>
-      )}
-      {children}
-      {error && <p className="text-[13px] leading-4 text-coral">{error}</p>}
-    </div>
-  )
-}
-
-function SelectArrow() {
-  return <img src={arrowDown} alt="" width={10.8333} height={6.16667} className="pointer-events-none absolute top-1/2 right-3 -translate-y-1/2" />
-}
-
-function CheckoutBreadcrumb() {
-  return (
-    <nav aria-label="Você está em">
-      <ol className="flex flex-wrap gap-[1ch] text-[15px] leading-4 font-bold">
-        <li>
-          <Link to="/" className="rounded-sm hover:text-brand">
-            Início
-          </Link>
-        </li>
-        <li aria-hidden>/</li>
-        <li>
-          <Link to="/" hash="mercado" className="rounded-sm hover:text-brand">
-            Mercado
-          </Link>
-        </li>
-        <li aria-hidden>/</li>
-        <li>Pagamento</li>
-      </ol>
-    </nav>
-  )
 }
 
 type CheckoutDesktopProps = {
@@ -156,215 +105,80 @@ export function CheckoutDesktop({ user, cart, pending, notice, onSubmit }: Check
     >
       <div className="flex min-w-0 flex-1 flex-col gap-5">
         <h1 className="sr-only">Pagamento</h1>
-        <CheckoutBreadcrumb />
+        <Breadcrumb current="Pagamento" />
         <h2 className="text-lg leading-4 font-bold">Perfil do colecionador</h2>
         <div className="grid gap-x-6 gap-y-5 sm:grid-cols-2">
           <form.Field name="displayName">
-            {(field) => (
-              <Field id="display-name" label="Nome de exibição" required error={fieldError(field.state.meta.errors)}>
-                <input
-                  ref={bind('displayName')}
-                  id="display-name"
-                  value={field.state.value}
-                  onBlur={field.handleBlur}
-                  onChange={(event) => field.handleChange(event.target.value)}
-                  autoComplete="nickname"
-                  aria-invalid={Boolean(fieldError(field.state.meta.errors)) || undefined}
-                  className={controlClass}
-                />
-              </Field>
-            )}
+            {(field) => <TextField layout="checkout" id="display-name" label="Nome de exibição" required autoComplete="nickname" inputRef={bind('displayName')} {...fieldProps(field)} />}
           </form.Field>
           <form.Field name="username">
-            {(field) => (
-              <Field id="username" label="Nome de usuário" required error={fieldError(field.state.meta.errors)}>
-                <input
-                  ref={bind('username')}
-                  id="username"
-                  value={field.state.value}
-                  onBlur={field.handleBlur}
-                  onChange={(event) => field.handleChange(event.target.value)}
-                  autoComplete="username"
-                  aria-invalid={Boolean(fieldError(field.state.meta.errors)) || undefined}
-                  className={controlClass}
-                />
-              </Field>
-            )}
+            {(field) => <TextField layout="checkout" id="username" label="Nome de usuário" required autoComplete="username" inputRef={bind('username')} {...fieldProps(field)} />}
           </form.Field>
           <form.Field name="network">
             {(field) => (
-              <Field id="network" label="Rede" required error={fieldError(field.state.meta.errors)}>
-                <div className="relative">
-                  <select
-                    ref={bind('network')}
-                    id="network"
-                    value={field.state.value}
-                    onBlur={field.handleBlur}
-                    onChange={(event) => field.handleChange(event.target.value)}
-                    aria-invalid={Boolean(fieldError(field.state.meta.errors)) || undefined}
-                    className={cn(controlClass, 'appearance-none pr-8', !field.state.value && 'text-tertiary')}
-                  >
-                    <option value="">Selecione uma rede</option>
-                    {NETWORKS.map((item) => (
-                      <option key={item.id} value={item.id}>
-                        {item.label}
-                      </option>
-                    ))}
-                  </select>
-                  <SelectArrow />
-                </div>
-              </Field>
+              <SelectField layout="checkout" id="network" label="Rede" placeholder="Selecione uma rede" required options={NETWORKS} selectRef={bind('network')} {...fieldProps(field)} />
             )}
           </form.Field>
           <form.Field name="profileName">
-            {(field) => (
-              <Field id="profile-name" label="Nome do perfil" required error={fieldError(field.state.meta.errors)}>
-                <input
-                  ref={bind('profileName')}
-                  id="profile-name"
-                  value={field.state.value}
-                  onBlur={field.handleBlur}
-                  onChange={(event) => field.handleChange(event.target.value)}
-                  aria-invalid={Boolean(fieldError(field.state.meta.errors)) || undefined}
-                  className={controlClass}
-                />
-              </Field>
-            )}
+            {(field) => <TextField layout="checkout" id="profile-name" label="Nome do perfil" required inputRef={bind('profileName')} {...fieldProps(field)} />}
           </form.Field>
           <form.Field name="walletAddress">
             {(field) => (
-              <Field id="wallet-address" label="Endereço da carteira" required error={fieldError(field.state.meta.errors)}>
-                <input
-                  ref={bind('walletAddress')}
-                  id="wallet-address"
-                  value={field.state.value}
-                  onBlur={field.handleBlur}
-                  onChange={(event) => field.handleChange(event.target.value)}
-                  placeholder="Endereço 0x da carteira"
-                  autoComplete="off"
-                  spellCheck={false}
-                  aria-invalid={Boolean(fieldError(field.state.meta.errors)) || undefined}
-                  className={controlClass}
-                />
-              </Field>
+              <TextField
+                layout="checkout"
+                id="wallet-address"
+                label="Endereço da carteira"
+                required
+                placeholder="Endereço 0x da carteira"
+                autoComplete="off"
+                spellCheck={false}
+                inputRef={bind('walletAddress')}
+                {...fieldProps(field)}
+              />
             )}
           </form.Field>
           <form.Field name="secondaryWallet">
             {(field) => (
-              <Field error={fieldError(field.state.meta.errors)}>
-                <input
-                  ref={bind('secondaryWallet')}
-                  value={field.state.value}
-                  onBlur={field.handleBlur}
-                  onChange={(event) => field.handleChange(event.target.value)}
-                  placeholder="ENS ou carteira secundária (opcional)"
-                  aria-label="ENS ou carteira secundária (opcional)"
-                  autoComplete="off"
-                  spellCheck={false}
-                  aria-invalid={Boolean(fieldError(field.state.meta.errors)) || undefined}
-                  className={controlClass}
-                />
-              </Field>
+              <TextField
+                layout="checkout"
+                id="secondary-wallet"
+                ariaLabel="ENS ou carteira secundária (opcional)"
+                placeholder="ENS ou carteira secundária (opcional)"
+                autoComplete="off"
+                spellCheck={false}
+                inputRef={bind('secondaryWallet')}
+                {...fieldProps(field)}
+              />
             )}
           </form.Field>
           <form.Field name="walletType">
             {(field) => (
-              <Field id="wallet-type" label="Tipo de carteira" required error={fieldError(field.state.meta.errors)}>
-                <div className="relative">
-                  <select
-                    ref={bind('walletType')}
-                    id="wallet-type"
-                    value={field.state.value}
-                    onBlur={field.handleBlur}
-                    onChange={(event) => field.handleChange(event.target.value)}
-                    aria-invalid={Boolean(fieldError(field.state.meta.errors)) || undefined}
-                    className={cn(controlClass, 'appearance-none pr-8', !field.state.value && 'text-tertiary')}
-                  >
-                    <option value="">Selecione uma carteira</option>
-                    {WALLETS.map((item) => (
-                      <option key={item.id} value={item.id}>
-                        {item.label}
-                      </option>
-                    ))}
-                  </select>
-                  <SelectArrow />
-                </div>
-              </Field>
+              <SelectField layout="checkout" id="wallet-type" label="Tipo de carteira" placeholder="Selecione uma carteira" required options={WALLETS} selectRef={bind('walletType')} {...fieldProps(field)} />
             )}
           </form.Field>
           <form.Field name="referralCode">
             {(field) => (
-              <Field id="referral-code" label="Código de indicação" required error={fieldError(field.state.meta.errors)}>
-                <input
-                  ref={bind('referralCode')}
-                  id="referral-code"
-                  value={field.state.value}
-                  onBlur={field.handleBlur}
-                  onChange={(event) => field.handleChange(event.target.value)}
-                  autoComplete="off"
-                  spellCheck={false}
-                  aria-invalid={Boolean(fieldError(field.state.meta.errors)) || undefined}
-                  className={controlClass}
-                />
-              </Field>
+              <TextField layout="checkout" id="referral-code" label="Código de indicação" required autoComplete="off" spellCheck={false} inputRef={bind('referralCode')} {...fieldProps(field)} />
             )}
           </form.Field>
           <form.Field name="email">
             {(field) => (
-              <Field id="checkout-email" label="E-mail" required error={fieldError(field.state.meta.errors)}>
-                <input
-                  ref={bind('email')}
-                  id="checkout-email"
-                  type="email"
-                  inputMode="email"
-                  value={field.state.value}
-                  onBlur={field.handleBlur}
-                  onChange={(event) => field.handleChange(event.target.value)}
-                  autoComplete="email"
-                  aria-invalid={Boolean(fieldError(field.state.meta.errors)) || undefined}
-                  className={controlClass}
-                />
-              </Field>
+              <TextField layout="checkout" id="checkout-email" label="E-mail" required type="email" inputMode="email" autoComplete="email" inputRef={bind('email')} {...fieldProps(field)} />
             )}
           </form.Field>
           <form.Field name="ensName">
-            {(field) => (
-              <Field id="ens-name" label="Nome ENS" required error={fieldError(field.state.meta.errors)}>
-                <div className="flex gap-2">
-                  <form.Field name="ensSuffix">
-                    {(suffix) => (
-                      <div className="relative w-[78px] shrink-0">
-                        <select
-                          ref={bind('ensSuffix')}
-                          aria-label="Sufixo do nome ENS"
-                          value={suffix.state.value}
-                          onBlur={suffix.handleBlur}
-                          onChange={(event) => suffix.handleChange(event.target.value)}
-                          className={cn(controlClass, 'appearance-none pr-8')}
-                        >
-                          {ENS_SUFFIXES.map((item) => (
-                            <option key={item.id} value={item.id}>
-                              {item.label}
-                            </option>
-                          ))}
-                        </select>
-                        <SelectArrow />
-                      </div>
-                    )}
-                  </form.Field>
-                  <input
-                    ref={bind('ensName')}
+            {(name) => (
+              <form.Field name="ensSuffix">
+                {(suffix) => (
+                  <EnsField
+                    layout="checkout"
                     id="ens-name"
-                    value={field.state.value}
-                    onBlur={field.handleBlur}
-                    onChange={(event) => field.handleChange(event.target.value)}
-                    autoComplete="off"
-                    spellCheck={false}
-                    aria-invalid={Boolean(fieldError(field.state.meta.errors)) || undefined}
-                    className={cn(controlClass, 'min-w-0 flex-1')}
+                    required
+                    name={{ ...fieldProps(name), inputRef: bind('ensName') }}
+                    suffix={{ ...fieldProps(suffix), selectRef: bind('ensSuffix') }}
                   />
-                </div>
-              </Field>
+                )}
+              </form.Field>
             )}
           </form.Field>
         </div>
@@ -389,21 +203,30 @@ export function CheckoutDesktop({ user, cart, pending, notice, onSubmit }: Check
         </form.Field>
 
         <form.Field name="notes">
-          {(field) => (
-            <div className="flex max-w-[350px] flex-col gap-3">
-              <textarea
-                ref={bind('notes')}
-                value={field.state.value}
-                onBlur={field.handleBlur}
-                onChange={(event) => field.handleChange(event.target.value)}
-                placeholder="Observação do colecionador (opcional)"
-                aria-label="Observação do colecionador (opcional)"
-                aria-invalid={Boolean(fieldError(field.state.meta.errors)) || undefined}
-                className={cn(controlClass, 'h-[152px] resize-none py-3')}
-              />
-              {fieldError(field.state.meta.errors) && <p className="text-[13px] leading-4 text-coral">{fieldError(field.state.meta.errors)}</p>}
-            </div>
-          )}
+          {(field) => {
+            const error = fieldError(field.state.meta.errors)
+            return (
+              <div className="flex max-w-[350px] flex-col gap-3">
+                <textarea
+                  ref={bind('notes')}
+                  id="checkout-notes"
+                  value={field.state.value}
+                  onBlur={field.handleBlur}
+                  onChange={(event) => field.handleChange(event.target.value)}
+                  placeholder="Observação do colecionador (opcional)"
+                  aria-label="Observação do colecionador (opcional)"
+                  aria-invalid={error ? true : undefined}
+                  aria-describedby={error ? errorIdFor('checkout-notes') : undefined}
+                  className={cn(controlClass, 'h-[152px] resize-none py-3')}
+                />
+                {error && (
+                  <p id={errorIdFor('checkout-notes')} className="text-[13px] leading-4 text-coral">
+                    {error}
+                  </p>
+                )}
+              </div>
+            )
+          }}
         </form.Field>
       </div>
 

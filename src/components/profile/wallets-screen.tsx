@@ -1,17 +1,17 @@
 import { useForm } from '@tanstack/react-form'
 import { useNavigate } from '@tanstack/react-router'
-import { useRef, useState, type ReactNode } from 'react'
-import arrowIcon from '@/assets/figma/wallet-arrow.svg'
+import { useRef, useState } from 'react'
 import radioIcon from '@/assets/figma/wallet-radio.svg'
+import { SignInRequired } from '@/components/auth/sign-in-required'
 import { AccountSidebar } from '@/components/profile/account-sidebar'
-import { InlineAlert, RetryAlert } from '@/components/ui/inline-alert'
+import { EnsField, SelectField, TextField } from '@/components/ui/form-field'
+import { RetryAlert } from '@/components/ui/inline-alert'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useLogout, useSession } from '@/lib/api/auth'
 import { ApiError, getErrorMessage } from '@/lib/api/errors'
-import { ENS_SUFFIXES, NETWORKS, WALLETS, type CollectorWallet, type CollectorWallets, type EnsSuffix, type NetworkId, type WalletId } from '@/lib/api/types'
+import { NETWORKS, WALLETS, type CollectorWallet, type CollectorWallets, type EnsSuffix } from '@/lib/api/types'
 import { useCollectorWallets, useUpdateWallets } from '@/lib/api/wallets'
-import { authIntent } from '@/lib/auth/auth-dialog'
-import { fieldError, firstInvalidField, formErrorMessage, handleAuthSubmit, setServerErrors } from '@/lib/forms'
+import { fieldProps, firstInvalidField, formErrorMessage, handleAuthSubmit, setServerErrors } from '@/lib/forms'
 import { cn } from '@/lib/utils'
 import { walletSchema } from '@/lib/validation'
 
@@ -44,9 +44,6 @@ type WalletValues = {
   ensName: string
   ensSuffix: string
 }
-
-const controlClass =
-  'h-10 w-full rounded-[3px] border border-border bg-transparent px-3 text-sm leading-4 text-foreground outline-none placeholder:text-sm placeholder:text-tertiary focus-visible:border-primary aria-invalid:border-coral'
 
 const rowClass = 'flex flex-col gap-6 min-[1440px]:flex-row min-[1440px]:justify-between min-[1440px]:gap-0'
 
@@ -91,7 +88,7 @@ export function WalletsScreen() {
   const wallets = useCollectorWallets(user?.id)
 
   if (isPending || (user && wallets.isPending)) return <WalletsSkeleton />
-  if (!user) return <SignedOut />
+  if (!user) return <SignInRequired message="Entre para ver e editar as suas carteiras." notice="Entre para ver as suas carteiras." path="/wallets" />
   if (!wallets.data) {
     return (
       <RetryAlert
@@ -280,64 +277,21 @@ function WalletEditor({
         <div className={rowClass}>
           <form.Field name="displayName">
             {(field) => (
-              <TextField
-                id={`${idPrefix}-display-name`}
-                label="Nome de exibição"
-                required
-                autoComplete="nickname"
-                fieldRef={bind('displayName')}
-                value={field.state.value}
-                error={fieldError(field.state.meta.errors)}
-                onBlur={field.handleBlur}
-                onChange={field.handleChange}
-              />
+              <TextField id={`${idPrefix}-display-name`} label="Nome de exibição" required autoComplete="nickname" inputRef={bind('displayName')} {...fieldProps(field)} />
             )}
           </form.Field>
           <form.Field name="walletNickname">
-            {(field) => (
-              <TextField
-                id={`${idPrefix}-nickname`}
-                label="Apelido da carteira"
-                required
-                fieldRef={bind('walletNickname')}
-                value={field.state.value}
-                error={fieldError(field.state.meta.errors)}
-                onBlur={field.handleBlur}
-                onChange={field.handleChange}
-              />
-            )}
+            {(field) => <TextField id={`${idPrefix}-nickname`} label="Apelido da carteira" required inputRef={bind('walletNickname')} {...fieldProps(field)} />}
           </form.Field>
         </div>
         <div className={rowClass}>
           <form.Field name="network">
             {(field) => (
-              <SelectField
-                id={`${idPrefix}-network`}
-                label="Rede"
-                placeholder="Selecione uma rede"
-                required
-                fieldRef={bind('network')}
-                value={field.state.value}
-                error={fieldError(field.state.meta.errors)}
-                onBlur={field.handleBlur}
-                onChange={field.handleChange}
-                options={NETWORKS}
-              />
+              <SelectField id={`${idPrefix}-network`} label="Rede" placeholder="Selecione uma rede" required options={NETWORKS} selectRef={bind('network')} {...fieldProps(field)} />
             )}
           </form.Field>
           <form.Field name="profileName">
-            {(field) => (
-              <TextField
-                id={`${idPrefix}-profile-name`}
-                label="Nome do perfil"
-                required
-                fieldRef={bind('profileName')}
-                value={field.state.value}
-                error={fieldError(field.state.meta.errors)}
-                onBlur={field.handleBlur}
-                onChange={field.handleChange}
-              />
-            )}
+            {(field) => <TextField id={`${idPrefix}-profile-name`} label="Nome do perfil" required inputRef={bind('profileName')} {...fieldProps(field)} />}
           </form.Field>
         </div>
         <div className={cn(rowClass, 'min-[1440px]:items-end')}>
@@ -350,122 +304,53 @@ function WalletEditor({
                 placeholder="Endereço 0x da carteira"
                 spellCheck={false}
                 autoComplete="off"
-                fieldRef={bind('walletAddress')}
-                value={field.state.value}
-                error={fieldError(field.state.meta.errors)}
-                onBlur={field.handleBlur}
-                onChange={field.handleChange}
+                inputRef={bind('walletAddress')}
+                {...fieldProps(field)}
               />
             )}
           </form.Field>
           <form.Field name="secondaryAddress">
             {(field) => (
-              <Field error={fieldError(field.state.meta.errors)}>
-                <input
-                  ref={bind('secondaryAddress')}
-                  value={field.state.value}
-                  onBlur={field.handleBlur}
-                  onChange={(event) => field.handleChange(event.target.value)}
-                  placeholder="ENS ou carteira secundária (opcional)"
-                  aria-label="ENS ou carteira secundária (opcional)"
-                  autoComplete="off"
-                  spellCheck={false}
-                  aria-invalid={Boolean(fieldError(field.state.meta.errors)) || undefined}
-                  className={controlClass}
-                />
-              </Field>
+              <TextField
+                id={`${idPrefix}-secondary-address`}
+                ariaLabel="ENS ou carteira secundária (opcional)"
+                placeholder="ENS ou carteira secundária (opcional)"
+                spellCheck={false}
+                autoComplete="off"
+                inputRef={bind('secondaryAddress')}
+                {...fieldProps(field)}
+              />
             )}
           </form.Field>
         </div>
         <div className={rowClass}>
           <form.Field name="walletType">
             {(field) => (
-              <SelectField
-                id={`${idPrefix}-type`}
-                label="Tipo de carteira"
-                placeholder="Selecione uma carteira"
-                required
-                fieldRef={bind('walletType')}
-                value={field.state.value}
-                error={fieldError(field.state.meta.errors)}
-                onBlur={field.handleBlur}
-                onChange={field.handleChange}
-                options={WALLETS}
-              />
+              <SelectField id={`${idPrefix}-type`} label="Tipo de carteira" placeholder="Selecione uma carteira" required options={WALLETS} selectRef={bind('walletType')} {...fieldProps(field)} />
             )}
           </form.Field>
           <form.Field name="referralCode">
-            {(field) => (
-              <TextField
-                id={`${idPrefix}-referral`}
-                label="Código de indicação"
-                required
-                autoComplete="off"
-                fieldRef={bind('referralCode')}
-                value={field.state.value}
-                error={fieldError(field.state.meta.errors)}
-                onBlur={field.handleBlur}
-                onChange={field.handleChange}
-              />
-            )}
+            {(field) => <TextField id={`${idPrefix}-referral`} label="Código de indicação" required autoComplete="off" inputRef={bind('referralCode')} {...fieldProps(field)} />}
           </form.Field>
         </div>
         <div className={rowClass}>
           <form.Field name="email">
             {(field) => (
-              <TextField
-                id={`${idPrefix}-email`}
-                label="E-mail"
-                required
-                type="email"
-                inputMode="email"
-                autoComplete="email"
-                fieldRef={bind('email')}
-                value={field.state.value}
-                error={fieldError(field.state.meta.errors)}
-                onBlur={field.handleBlur}
-                onChange={field.handleChange}
-              />
+              <TextField id={`${idPrefix}-email`} label="E-mail" required type="email" inputMode="email" autoComplete="email" inputRef={bind('email')} {...fieldProps(field)} />
             )}
           </form.Field>
           <form.Field name="ensName">
-            {(field) => (
-              <Field label="Nome ENS" required error={fieldError(field.state.meta.errors)} htmlFor={`${idPrefix}-ens`}>
-                <div className="flex w-full gap-2.5">
-                  <form.Field name="ensSuffix">
-                    {(suffix) => (
-                      <div className="relative w-[78px] shrink-0">
-                        <select
-                          ref={bind('ensSuffix')}
-                          aria-label="Sufixo do nome ENS"
-                          value={suffix.state.value}
-                          onBlur={suffix.handleBlur}
-                          onChange={(event) => suffix.handleChange(event.target.value)}
-                          className={cn(controlClass, 'appearance-none pr-8 pl-2.5 text-[15px] leading-[15px]')}
-                        >
-                          {ENS_SUFFIXES.map((item) => (
-                            <option key={item.id} value={item.id}>
-                              {item.label}
-                            </option>
-                          ))}
-                        </select>
-                        <img src={arrowIcon} alt="" width={20} height={20} className="pointer-events-none absolute top-1/2 right-1.5 -translate-y-1/2" />
-                      </div>
-                    )}
-                  </form.Field>
-                  <input
-                    ref={bind('ensName')}
+            {(name) => (
+              <form.Field name="ensSuffix">
+                {(suffix) => (
+                  <EnsField
                     id={`${idPrefix}-ens`}
-                    value={field.state.value}
-                    onBlur={field.handleBlur}
-                    onChange={(event) => field.handleChange(event.target.value)}
-                    autoComplete="off"
-                    spellCheck={false}
-                    aria-invalid={Boolean(fieldError(field.state.meta.errors)) || undefined}
-                    className={controlClass}
+                    required
+                    name={{ ...fieldProps(name), inputRef: bind('ensName') }}
+                    suffix={{ ...fieldProps(suffix), selectRef: bind('ensSuffix') }}
                   />
-                </div>
-              </Field>
+                )}
+              </form.Field>
             )}
           </form.Field>
         </div>
@@ -491,149 +376,6 @@ function WalletEditor({
   )
 }
 
-function Field({
-  label,
-  required,
-  error,
-  htmlFor,
-  children,
-}: {
-  label?: string
-  required?: boolean
-  error?: string
-  htmlFor?: string
-  children: ReactNode
-}) {
-  return (
-    <div className="flex w-full max-w-[417px] shrink-0 flex-col gap-2.5">
-      {label && (
-        <label htmlFor={htmlFor} className="flex items-center gap-1 text-[15px] leading-[15px]">
-          {label}
-          {required && (
-            <span aria-hidden className="text-[22px] leading-[29px] text-coral">
-              *
-            </span>
-          )}
-        </label>
-      )}
-      {children}
-      {error && <p className="text-[13px] leading-4 text-coral">{error}</p>}
-    </div>
-  )
-}
-
-function TextField({
-  id,
-  label,
-  required,
-  type = 'text',
-  inputMode,
-  autoComplete,
-  placeholder,
-  spellCheck,
-  value,
-  error,
-  fieldRef,
-  onBlur,
-  onChange,
-}: {
-  id: string
-  label: string
-  required?: boolean
-  type?: 'text' | 'email'
-  inputMode?: 'email'
-  autoComplete?: string
-  placeholder?: string
-  spellCheck?: boolean
-  value: string
-  error?: string
-  fieldRef: (node: HTMLInputElement | null) => void
-  onBlur: () => void
-  onChange: (value: string) => void
-}) {
-  return (
-    <Field label={label} required={required} error={error} htmlFor={id}>
-      <input
-        ref={fieldRef}
-        id={id}
-        type={type}
-        inputMode={inputMode}
-        autoComplete={autoComplete}
-        placeholder={placeholder}
-        spellCheck={spellCheck}
-        value={value}
-        onBlur={onBlur}
-        onChange={(event) => onChange(event.target.value)}
-        aria-invalid={Boolean(error) || undefined}
-        className={controlClass}
-      />
-    </Field>
-  )
-}
-
-function SelectField({
-  id,
-  label,
-  placeholder,
-  required,
-  value,
-  error,
-  options,
-  fieldRef,
-  onBlur,
-  onChange,
-}: {
-  id: string
-  label: string
-  placeholder: string
-  required?: boolean
-  value: string
-  error?: string
-  options: readonly { id: NetworkId | WalletId; label: string }[]
-  fieldRef: (node: HTMLSelectElement | null) => void
-  onBlur: () => void
-  onChange: (value: string) => void
-}) {
-  return (
-    <Field label={label} required={required} error={error} htmlFor={id}>
-      <div className="relative">
-        <select
-          ref={fieldRef}
-          id={id}
-          value={value}
-          onBlur={onBlur}
-          onChange={(event) => onChange(event.target.value)}
-          aria-invalid={Boolean(error) || undefined}
-          className={cn(controlClass, 'appearance-none pr-10', !value && 'text-tertiary')}
-        >
-          <option value="">{placeholder}</option>
-          {options.map((item) => (
-            <option key={item.id} value={item.id}>
-              {item.label}
-            </option>
-          ))}
-        </select>
-        <img src={arrowIcon} alt="" width={20} height={20} className="pointer-events-none absolute top-1/2 right-2 -translate-y-1/2" />
-      </div>
-    </Field>
-  )
-}
-
-function SignedOut() {
-  const navigate = useNavigate()
-  return (
-    <InlineAlert
-      message="Entre para ver e editar as suas carteiras."
-      action={{
-        label: 'Entrar',
-        onClick: () => {
-          authIntent.set({ notice: 'Entre para ver as suas carteiras.' })
-          void navigate({ to: '/wallets', search: { auth: 'login', redirect: '/wallets' } })
-        },
-      }}
-    />
-  )
-}
 
 function WalletsSkeleton() {
   return (

@@ -1,4 +1,4 @@
-import arrowBack from '@/assets/figma/arrow-back.svg'
+import { BackButton } from '@/components/ui/back-button'
 import dots from '@/assets/figma/dots.svg'
 import walletIcon from '@/assets/figma/wallet.svg'
 import { RadioMark } from '@/components/checkout/radio-mark'
@@ -48,11 +48,7 @@ export function CheckoutMobile({ cart, pending, notice, onBack, onConfirm }: Che
   return (
     <div className="flex min-h-dvh flex-col px-7 pt-8 pb-8">
       <header className="relative flex h-11 items-center">
-        <button type="button" aria-label="Voltar" onClick={onBack} className="grid size-[35px] place-items-center rounded-full border border-border bg-surface-raised">
-          <span className="grid size-5 place-items-center">
-            <img src={arrowBack} alt="" width={13.17} height={7.33} className="rotate-90" />
-          </span>
-        </button>
+        <BackButton onClick={onBack} />
         <h1 className="pointer-events-none absolute inset-x-0 text-center text-xl leading-4 font-bold">Pagamento com carteira</h1>
       </header>
 
