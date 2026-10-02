@@ -1,5 +1,6 @@
 import { queryOptions, useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query'
 import { sessionToken } from '@/lib/auth/session-token'
+import { cartKeys } from './cart'
 import { api } from './client'
 import { ApiError } from './errors'
 import type { LoginRequest, Session, SessionInfo, SignupRequest } from './types'
@@ -43,6 +44,14 @@ export async function clearPrivateData(queryClient: QueryClient) {
   mutations.findAll({ mutationKey: PRIVATE_ROOT }).forEach((mutation) => mutations.remove(mutation))
 }
 
+/**
+ * The cart belongs to whoever is signed in (or to the visitor), so it is refetched whenever the identity changes.
+ * Call it after the token changed, so the refetch speaks for the new identity.
+ */
+export function resetCart(queryClient: QueryClient) {
+  return queryClient.resetQueries({ queryKey: cartKeys.current })
+}
+
 /** Id of the signed-in user according to the cache; late mutation callbacks use it to avoid writing into another user's data. */
 export const currentUserId = (queryClient: QueryClient) =>
   queryClient.getQueryData<SessionInfo | null>(sessionKeys.current)?.user.id
@@ -51,12 +60,15 @@ export async function endSession(queryClient: QueryClient) {
   sessionToken.clear()
   await clearPrivateData(queryClient)
   queryClient.setQueryData(sessionKeys.current, null)
+  void resetCart(queryClient)
 }
 
 async function startSession(queryClient: QueryClient, { token, ...session }: Session) {
   await clearPrivateData(queryClient)
   sessionToken.set(token)
   queryClient.setQueryData(sessionKeys.current, session)
+  // The server moved the visitor's cart into the account on login; show the account's cart.
+  void resetCart(queryClient)
 }
 
 export function useLogin() {

@@ -44,3 +44,10 @@ export async function signInAt(page: Page, path: string, user: TestUser) {
 
 /** Opens the account control of the current layout (header on desktop, tab bar on mobile). */
 export const accountButton = (page: Page, user: TestUser) => page.getByRole('button', { name: `Conta de ${user.name}` })
+
+/** Logs out through the account menu. */
+export async function signOut(page: Page, user: TestUser) {
+  await accountButton(page, user).click()
+  await page.getByRole('menuitem', { name: 'Sair' }).click()
+  await expect(page.getByRole('button', { name: 'Entrar', exact: true }).first()).toBeVisible()
+}

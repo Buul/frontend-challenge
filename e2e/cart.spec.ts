@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test'
-import { signIn, USERS } from './auth-helpers.ts'
+import { signIn, signInAt, signOut, USERS } from './auth-helpers.ts'
 
 const buy = (page: Page) => page.getByRole('button', { name: /^(COMPRAR|Comprar NFT)$/ })
 
@@ -57,4 +57,41 @@ test('ícone do header abre o carrinho vazio', async ({ page }, testInfo) => {
   await page.getByRole('link', { name: 'Carrinho vazio' }).click()
   await expect(page).toHaveURL(/\/cart$/)
   await expect(page.getByText('Seu carrinho está vazio')).toBeVisible()
+})
+
+test('código expirado é recusado com a mensagem certa', async ({ page }) => {
+  await page.goto('/nfts/nft-1?edition=open')
+  await buy(page).click()
+  await expect(page).toHaveURL(/\/cart$/)
+
+  await page.getByLabel('Código promocional').fill('LANCAMENTO20')
+  await page.getByRole('button', { name: 'Aplicar' }).click()
+  await expect(page.getByText('Este código promocional expirou.')).toBeVisible()
+  await expect(page.getByText('(-) 0.00')).toBeVisible()
+})
+
+test('o carrinho do visitante passa para a conta ao entrar e cada conta vê só o seu', async ({ page }) => {
+  // Visitor picks Sage Nomad #009, then signs in as Ana: the item moves into Ana's cart.
+  await page.goto('/nfts/nft-2?edition=open')
+  await buy(page).click()
+  await expect(page).toHaveURL(/\/cart$/)
+  await page.goto('/cart?auth=login')
+  await signIn(page, USERS.ana)
+  await expect(page.getByRole('heading', { name: 'Sage Nomad #009' })).toBeVisible()
+
+  // Ana logs out: the browser is back to an empty visitor cart, not Ana's.
+  await page.goto('/')
+  await signOut(page, USERS.ana)
+  await page.goto('/cart')
+  await expect(page.getByText('Seu carrinho está vazio')).toBeVisible()
+
+  // Bruno never sees Ana's items.
+  await signInAt(page, '/cart', USERS.bruno)
+  await expect(page.getByText('Seu carrinho está vazio')).toBeVisible()
+  await page.goto('/')
+  await signOut(page, USERS.bruno)
+
+  // And Ana finds her cart where she left it.
+  await signInAt(page, '/cart', USERS.ana)
+  await expect(page.getByRole('heading', { name: 'Sage Nomad #009' })).toBeVisible()
 })

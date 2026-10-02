@@ -33,7 +33,7 @@ import { shortenAddress } from '@/lib/format'
 import type { PlaceOrderRequest } from '@/lib/api/orders'
 import { cartItemSchema, cartPromoSchema, cartQuantitySchema, checkoutSchema, EMAIL_PATTERN, loginSchema, profileUpdateSchema, signupSchema, toFieldErrors, walletSchema } from '@/lib/validation'
 import { authenticate, collectorProfile, registerUser, sessionStore, toPublicUser, updateCollectorProfile, verifyCredentials } from './auth'
-import { cartStore } from './cart-store'
+import { cartStore, GUEST_CART } from './cart-store'
 import { featuredNfts, nftDetails, nfts, relatedNfts } from './data'
 // Applies the persisted live prices and supply to the fixtures before any handler reads them.
 import './market-store'
@@ -92,6 +92,16 @@ function parseListParams(params: URLSearchParams) {
   }
 
   return { query, errors }
+}
+
+/**
+ * The cart a request works on: the signed-in user's, or the visitor's when no token is sent.
+ * A token that no longer resolves is a `401`, so an expired session is noticed instead of silently showing the visitor cart.
+ */
+function cartOwner(request: Request) {
+  if (!request.headers.has('Authorization')) return { owner: GUEST_CART }
+  const session = authenticate(request)
+  return session ? { owner: session.user.id } : { error: unauthenticated() }
 }
 
 export const handlers: RequestHandler[] = [
@@ -165,6 +175,7 @@ export const handlers: RequestHandler[] = [
     const user = await verifyCredentials(parsed.data.email, parsed.data.password)
     // Same answer for unknown e-mail and wrong password, so accounts can't be enumerated.
     if (!user) return unauthenticated('E-mail ou senha incorretos.')
+    cartStore.adoptGuestCart(user.id)
     return HttpResponse.json<Session>({ ...sessionStore.create(user.id), user: toPublicUser(user) })
   }),
 
@@ -180,6 +191,7 @@ export const handlers: RequestHandler[] = [
       const message = 'Já existe uma conta com este e-mail. Entre ou use outro e-mail.'
       return conflict(message, { email: message })
     }
+    cartStore.adoptGuestCart(user.id)
     return HttpResponse.json<Session>({ ...sessionStore.create(user.id), user: toPublicUser(user) }, { status: 201 })
   }),
 
@@ -232,17 +244,21 @@ export const handlers: RequestHandler[] = [
     return HttpResponse.json<ProfileUpdateResponse>({ user: toPublicUser(result.user), profile: result.profile })
   }),
 
-  http.get<never, never, Cart>(`${API}/cart`, async () => {
+  http.get<never, never, Cart | ApiErrorBody>(`${API}/cart`, async ({ request }) => {
     await delay(200)
-    return HttpResponse.json<Cart>(cartStore.get())
+    const cart = cartOwner(request)
+    if ('error' in cart) return cart.error
+    return HttpResponse.json<Cart>(cartStore.get(cart.owner))
   }),
 
   http.post<never, Partial<CartItemInput>, Cart | ApiErrorBody>(`${API}/cart/items`, async ({ request }) => {
     await delay(400)
     if (isScenarioActive('cart-error')) return serviceUnavailable()
+    const cart = cartOwner(request)
+    if ('error' in cart) return cart.error
     const parsed = cartItemSchema.safeParse(await request.json().catch(() => ({})))
     if (!parsed.success) return validationError(toFieldErrors(parsed.error), 'Verifique os dados informados.')
-    const result = cartStore.add(parsed.data)
+    const result = cartStore.add(cart.owner, parsed.data)
     if ('error' in result) {
       if (result.error === 'not-found') return notFound('NFT não encontrado.')
       if (result.error === 'sold-out') return conflict('Esta edição está esgotada.')
@@ -254,9 +270,11 @@ export const handlers: RequestHandler[] = [
   http.patch<never, Partial<CartItemInput>, Cart | ApiErrorBody>(`${API}/cart/items`, async ({ request }) => {
     await delay(250)
     if (isScenarioActive('cart-error')) return serviceUnavailable()
+    const cart = cartOwner(request)
+    if ('error' in cart) return cart.error
     const parsed = cartQuantitySchema.safeParse(await request.json().catch(() => ({})))
     if (!parsed.success) return validationError(toFieldErrors(parsed.error), 'Verifique os dados informados.')
-    const result = cartStore.setQuantity(parsed.data)
+    const result = cartStore.setQuantity(cart.owner, parsed.data)
     if ('error' in result) {
       if (result.error === 'not-found') return notFound('Este item não está no carrinho.')
       if (result.error === 'sold-out') return conflict('Esta edição está esgotada.')
@@ -268,10 +286,15 @@ export const handlers: RequestHandler[] = [
   http.post<never, { code?: unknown }, Cart | ApiErrorBody>(`${API}/cart/promo`, async ({ request }) => {
     await delay(350)
     if (isScenarioActive('cart-error')) return serviceUnavailable()
+    const cart = cartOwner(request)
+    if ('error' in cart) return cart.error
     const parsed = cartPromoSchema.safeParse(await request.json().catch(() => ({})))
     if (!parsed.success) return validationError(toFieldErrors(parsed.error), 'Verifique o código informado.')
-    const result = cartStore.applyPromo(parsed.data.code)
-    if ('error' in result) return conflict('Código promocional inválido.', { code: 'Código promocional inválido.' })
+    const result = cartStore.applyPromo(cart.owner, parsed.data.code)
+    if ('error' in result) {
+      const message = result.error === 'expired' ? 'Este código promocional expirou.' : 'Código promocional inválido.'
+      return conflict(message, { code: message })
+    }
     return HttpResponse.json<Cart>(result.cart)
   }),
 
@@ -286,13 +309,13 @@ export const handlers: RequestHandler[] = [
 
     // The client sends the total it showed; if prices or supply moved since, the collector must review it first.
     const expectedTotal = isRecord(body) ? body.expectedTotal : undefined
-    const current = cartStore.get()
+    const current = cartStore.get(session.user.id)
     if (current.itemCount === 0) return conflict('Seu carrinho está vazio.')
     if (!isEthAmount(expectedTotal) || compareEth(expectedTotal, current.total) !== 0) {
       return conflict('Os preços ou a disponibilidade mudaram. Revise o novo total antes de confirmar.')
     }
 
-    const taken = cartStore.take()
+    const taken = cartStore.take(session.user.id)
     if ('error' in taken) return conflict('Seu carrinho está vazio.')
 
     const network = NETWORKS.find((item) => item.id === parsed.data.network)

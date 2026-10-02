@@ -1,6 +1,6 @@
 import { useQueryClient } from '@tanstack/react-query'
 import { useCallback, useEffect } from 'react'
-import { clearPrivateData, endSession, sessionKeys, useSession } from '@/lib/api/auth'
+import { clearPrivateData, endSession, resetCart, sessionKeys, useSession } from '@/lib/api/auth'
 import { useAuthDialog } from '@/lib/auth/auth-dialog'
 import { onSessionExpired, SESSION_TOKEN_KEY } from '@/lib/auth/session-token'
 
@@ -32,7 +32,10 @@ export function SessionSync() {
   useEffect(() => {
     const onStorage = (event: StorageEvent) => {
       if (event.key !== SESSION_TOKEN_KEY && event.key !== null) return
-      void clearPrivateData(queryClient).then(() => queryClient.invalidateQueries({ queryKey: sessionKeys.current }))
+      void clearPrivateData(queryClient).then(() => {
+        void resetCart(queryClient)
+        return queryClient.invalidateQueries({ queryKey: sessionKeys.current })
+      })
     }
     window.addEventListener('storage', onStorage)
     return () => window.removeEventListener('storage', onStorage)

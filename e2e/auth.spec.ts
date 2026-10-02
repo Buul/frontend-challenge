@@ -4,6 +4,7 @@ import {
   fillSignup,
   signIn,
   signInAt,
+  signOut,
   submitSignup,
   switchToLogin,
   switchToSignup,
@@ -14,12 +15,6 @@ import {
 const CARLA: TestUser = { name: 'Carla Dias', email: 'carla@kurio.dev', password: 'Colecao2026' }
 
 const openLogin = (page: Page) => page.getByRole('button', { name: 'Entrar', exact: true }).first().click()
-
-async function signOut(page: Page, user: TestUser) {
-  await accountButton(page, user).click()
-  await page.getByRole('menuitem', { name: 'Sair' }).click()
-  await expect(page.getByRole('button', { name: 'Entrar', exact: true }).first()).toBeVisible()
-}
 
 test('login valida os campos, informa credenciais inválidas e mantém a página atual', async ({ page }) => {
   await page.goto('/?tab=new')

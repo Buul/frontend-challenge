@@ -70,7 +70,7 @@ function settleOrder(id: string) {
   const settled = ordersStore.settle(id)
   if (!settled) return
   if (settled.order.status === 'confirmed') marketStore.sell(settled.lines).forEach(publishNftUpdated)
-  else cartStore.restore(settled.lines, settled.promoCode)
+  else cartStore.restore(settled.userId, settled.lines, settled.promoCode)
   publishOrderUpdated(settled.userId, settled.order)
 }
 
