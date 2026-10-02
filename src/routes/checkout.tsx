@@ -14,7 +14,7 @@ import { useIsMobile } from '@/hooks/use-media-query'
 import { sessionKeys, useSession } from '@/lib/api/auth'
 import { cartKeys, cartQueryOptions } from '@/lib/api/cart'
 import { ApiError, getErrorMessage } from '@/lib/api/errors'
-import { orderQueryOptions, usePlaceOrder, type CheckoutRequest } from '@/lib/api/orders'
+import { createAttemptKeys, orderQueryOptions, usePlaceOrder, type CheckoutRequest } from '@/lib/api/orders'
 import type { SessionInfo, WalletId } from '@/lib/api/types'
 import { compareEth } from '@/lib/eth'
 import { formatEth } from '@/lib/format'
@@ -48,6 +48,7 @@ function CheckoutPage() {
   const order = useQuery({ ...orderQueryOptions(user?.id ?? '', orderId ?? ''), enabled: Boolean(user && orderId) })
   const { open: openLogin } = useAuthDialog()
   const [notice, setNotice] = useState<string>()
+  const [attemptKeys] = useState(createAttemptKeys)
   const confirmed = order.data?.status === 'confirmed'
 
   const onBack = () => (canGoBack ? router.history.back() : void router.navigate({ to: '/cart' }))
@@ -84,9 +85,13 @@ function CheckoutPage() {
       })
       return
     }
+    // A confirmation already on its way covers this click too.
+    if (placeOrder.isPending) return
     const expectedTotal = queryClient.getQueryData<{ total: string }>(cartKeys.current)?.total ?? '0'
+    const request = { ...input, expectedTotal }
     try {
-      const placed = await placeOrder.mutateAsync({ ...input, expectedTotal })
+      const placed = await placeOrder.mutateAsync({ input: request, idempotencyKey: attemptKeys.keyFor(request) })
+      attemptKeys.reset()
       void navigate({ search: (prev) => ({ ...prev, order: placed.id }), replace: true })
     } catch (error) {
       // Prices or supply moved since the page loaded: show the fresh cart and let the collector confirm again.

@@ -37,7 +37,7 @@ import { cartStore, GUEST_CART } from './cart-store'
 import { featuredNfts, nftDetails, nfts, relatedNfts } from './data'
 // Applies the persisted live prices and supply to the fixtures before any handler reads them.
 import './market-store'
-import { ordersStore } from './orders-store'
+import { idempotencyKeys, ordersStore } from './orders-store'
 import { placeOrder, settleDueOrders } from './realtime'
 import { favoritesStore } from './favorites-store'
 import { conflict, notFound, serviceUnavailable, unauthenticated, validationError } from './http'
@@ -303,12 +303,27 @@ export const handlers: RequestHandler[] = [
     const session = authenticate(request)
     if (!session) return unauthenticated('Entre para finalizar a compra.')
     if (isScenarioActive('checkout-error')) return serviceUnavailable()
+
+    const key = request.headers.get('Idempotency-Key')?.trim()
+    if (!key) return validationError({ idempotencyKey: 'Envie o cabeçalho Idempotency-Key.' }, 'Tentativa de compra sem identificação.')
+
     const body: unknown = await request.json().catch(() => ({}))
     const parsed = checkoutSchema.safeParse(body)
     if (!parsed.success) return validationError(toFieldErrors(parsed.error), 'Verifique os dados informados.')
+    const expectedTotal = isRecord(body) ? body.expectedTotal : undefined
+    const fingerprint = JSON.stringify({ ...parsed.data, expectedTotal })
+
+    // A retry of an attempt that already created an order gets that order back, whatever happened to the cart since.
+    const previous = idempotencyKeys.get(key)
+    if (previous) {
+      if (previous.userId !== session.user.id || previous.fingerprint !== fingerprint) {
+        return conflict('Esta tentativa de compra já foi usada com outros dados. Confirme a compra novamente.')
+      }
+      const order = ordersStore.get(session.user.id, previous.orderId)
+      return order ? HttpResponse.json<Order>(order) : notFound('Pedido não encontrado.')
+    }
 
     // The client sends the total it showed; if prices or supply moved since, the collector must review it first.
-    const expectedTotal = isRecord(body) ? body.expectedTotal : undefined
     const current = cartStore.get(session.user.id)
     if (current.itemCount === 0) return conflict('Seu carrinho está vazio.')
     if (!isEthAmount(expectedTotal) || compareEth(expectedTotal, current.total) !== 0) {
@@ -350,6 +365,11 @@ export const handlers: RequestHandler[] = [
       lines: cart.items.map(({ nftId, editionId, quantity }) => ({ nftId, editionId, quantity })),
       promoCode: cart.promoCode,
     })
+
+    idempotencyKeys.save(key, { userId: session.user.id, fingerprint, orderId: order.id })
+    // The order exists, but the client never hears about it: only a retry with the same key can recover it.
+    if (isScenarioActive('checkout-timeout')) return HttpResponse.error()
+
     // 202: the wallet answer arrives later through `order.updated` (or `GET /orders/:id`).
     return HttpResponse.json<Order>(order, { status: 202 })
   }),

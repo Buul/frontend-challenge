@@ -20,6 +20,8 @@ export type MockScenario =
   | 'profile-error'
   /** `PUT /auth/wallets` answers 503. */
   | 'wallets-error'
+  /** `POST /orders` creates the order but the first response is lost (network error); the client retries with the same key. */
+  | 'checkout-timeout'
   /** The wallet refuses the payment: orders settle as `refused` and the items go back to the cart. */
   | 'payment-refused'
   /** The realtime server refuses connections; clients keep retrying until the scenario is lifted. */

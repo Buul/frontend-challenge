@@ -52,6 +52,8 @@ export const ordersStore = {
     return Object.values(store.read()).filter((entry) => entry.order.status === 'pending')
   },
 
+  count: () => Object.keys(store.read()).length,
+
   /** Moves a pending order to its outcome. Returns `undefined` if it was already settled, so effects run once. */
   settle(id: string) {
     const entries = store.read()
@@ -71,5 +73,29 @@ export const ordersStore = {
     const settled = { ...entry, order }
     store.write({ ...entries, [id]: settled })
     return settled
+  },
+}
+
+type IdempotencyRecord = {
+  userId: string
+  /** The request body the key was first used with; the same key with another body is a conflict. */
+  fingerprint: string
+  orderId: string
+}
+
+const isIdempotencyRecord = (value: unknown): value is IdempotencyRecord =>
+  isRecord(value) && typeof value.userId === 'string' && typeof value.fingerprint === 'string' && typeof value.orderId === 'string'
+
+const idempotency = persisted<Record<string, IdempotencyRecord>>(
+  'kurio:mock:order-keys',
+  () => ({}),
+  (value) => isRecord(value) && Object.values(value).every(isIdempotencyRecord),
+)
+
+/** `Idempotency-Key` bookkeeping for `POST /orders`: a retried attempt gets the order it already created. */
+export const idempotencyKeys = {
+  get: (key: string): IdempotencyRecord | undefined => idempotency.read()[key],
+  save(key: string, record: IdempotencyRecord) {
+    idempotency.write({ ...idempotency.read(), [key]: record })
   },
 }

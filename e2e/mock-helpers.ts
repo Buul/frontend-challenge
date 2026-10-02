@@ -5,6 +5,7 @@ export type RealtimeEvent = { id: string; version: number; data: Record<string, 
 
 /** The subset of `window.kurioMock` (see `src/mocks/browser.ts`) the tests drive. */
 type KurioMock = {
+  orders: { count: () => number }
   realtime: {
     connections: () => number
     updateNft: (id: string, change: NftChange) => RealtimeEvent
@@ -35,6 +36,9 @@ export const realtime = (page: Page) => ({
   setOnline: (online: boolean) => page.evaluate((value) => (window as unknown as MockWindow).kurioMock.realtime.setOnline(value), online),
   settleOrders: () => page.evaluate(() => (window as unknown as MockWindow).kurioMock.realtime.settleOrders()),
 })
+
+/** Number of orders the mocked server created (all users). */
+export const orderCount = (page: Page) => page.evaluate(() => (window as unknown as MockWindow).kurioMock.orders.count())
 
 /** Sets mock scenarios and options before the app boots (they are read from `localStorage`). */
 export const mockStorage = (page: Page, entries: Record<string, string>) =>
