@@ -161,7 +161,7 @@ function WalletsEditor({ userId, book }: { userId: string; book: CollectorWallet
                 aria-checked={book.mirrorPrimary}
                 disabled={update.isPending}
                 onClick={onMirror}
-                className="flex items-center gap-2 text-sm leading-4 whitespace-nowrap disabled:opacity-60"
+                className="flex items-center gap-2 text-sm leading-4 disabled:opacity-60 min-[1440px]:whitespace-nowrap"
               >
                 <span className="relative grid size-4 shrink-0 place-items-center">
                   <img src={radioIcon} alt="" width={16} height={16} />

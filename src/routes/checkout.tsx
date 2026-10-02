@@ -8,6 +8,7 @@ import { checkoutFromWallet, type SavedWallet } from '@/components/checkout/wall
 import { PageShell } from '@/components/layout/page-shell'
 import { SiteFooter } from '@/components/layout/site-footer'
 import { SiteHeader } from '@/components/layout/site-header'
+import { SkipLink } from '@/components/layout/skip-link'
 import { RetryAlert } from '@/components/ui/inline-alert'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useIsMobile } from '@/hooks/use-media-query'
@@ -155,15 +156,18 @@ function CheckoutPage() {
 
   if (isMobile) {
     return (
-      <main id="conteudo" tabIndex={-1} className="outline-none">
-        {cart.data?.itemCount === 0 && (
-          <div className="px-7 pt-8">
-            <h1 className="text-xl leading-4 font-bold">Pagamento com carteira</h1>
-          </div>
-        )}
-        {body}
-        {dialog}
-      </main>
+      <>
+        <SkipLink />
+        <main id="conteudo" tabIndex={-1} className="outline-none">
+          {cart.data?.itemCount === 0 && (
+            <div className="px-7 pt-8">
+              <h1 className="text-xl leading-4 font-bold">Pagamento com carteira</h1>
+            </div>
+          )}
+          {body}
+          {dialog}
+        </main>
+      </>
     )
   }
 

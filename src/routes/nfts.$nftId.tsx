@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { PageShell } from '@/components/layout/page-shell'
 import { SiteFooter } from '@/components/layout/site-footer'
 import { SiteHeader } from '@/components/layout/site-header'
+import { SkipLink } from '@/components/layout/skip-link'
 import { StatusPage } from '@/components/layout/status-page'
 import { Breadcrumb, NftDetailDesktop, NftDetailDesktopSkeleton } from '@/components/nft/nft-detail-desktop'
 import { MOBILE_BUY_BAR_HEIGHT, NftDetailMobile, NftDetailMobileSkeleton } from '@/components/nft/nft-detail-mobile'
@@ -117,6 +118,7 @@ function NftDetailPage() {
   if (isMobile) {
     return (
       <div style={{ paddingBottom: nft ? MOBILE_BUY_BAR_HEIGHT : undefined }}>
+        <SkipLink />
         <main id="conteudo" tabIndex={-1} className="outline-none">
           {loadingStatus}
           {product}

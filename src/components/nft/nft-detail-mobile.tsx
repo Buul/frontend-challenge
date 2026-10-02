@@ -42,7 +42,8 @@ function Gallery({ images }: { images: NftImage[] }) {
       </ul>
       {pages > 1 && (
         // Sits just above where the details sheet overlaps the artwork, as in the design.
-        <div role="group" aria-label="Escolher imagem" className="absolute top-[299px] left-1/2 flex -translate-x-1/2 gap-[7px]">
+        // Each 7 px dot sits in a 24 px touch target (WCAG 2.5.8); the dots stay at the design's height.
+        <div role="group" aria-label="Escolher imagem" className="absolute top-[291px] left-1/2 flex -translate-x-1/2">
           {Array.from({ length: pages }, (_, index) => (
             <button
               key={index}
@@ -50,11 +51,16 @@ function Gallery({ images }: { images: NftImage[] }) {
               aria-label={`Imagem ${index + 1} de ${pages}`}
               aria-current={index === page ? 'true' : undefined}
               onClick={() => scrollToPage(index)}
-              className={cn(
-                'relative h-[7px] rounded-full bg-primary transition-all before:absolute before:-inset-2 motion-reduce:transition-none',
-                index === page ? 'w-7' : 'w-[7px] opacity-60',
-              )}
-            />
+              className="grid h-6 min-w-6 place-items-center rounded-full"
+            >
+              <span
+                aria-hidden
+                className={cn(
+                  'h-[7px] rounded-full bg-primary transition-all motion-reduce:transition-none',
+                  index === page ? 'w-7' : 'w-[7px] opacity-60',
+                )}
+              />
+            </button>
           ))}
         </div>
       )}

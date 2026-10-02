@@ -44,19 +44,25 @@ function Carousel({ nfts }: { nfts: Nft[] }) {
         ))}
       </ul>
       {pages > 1 && (
-        <div role="group" aria-label="Páginas de NFTs relacionados" className="flex gap-2">
+        <div role="group" aria-label="Páginas de NFTs relacionados" className="flex">
           {Array.from({ length: pages }, (_, index) => (
+            // 24 px touch target (WCAG 2.5.8) around the 12 px dot from the design.
             <button
               key={index}
               type="button"
               aria-label={`Página ${index + 1} de ${pages}`}
               aria-current={index === page ? 'true' : undefined}
               onClick={() => scrollToPage(index)}
-              className={cn(
-                'relative size-3 rounded-full border border-primary transition-colors before:absolute before:-inset-1.5',
-                index === page ? 'bg-primary' : 'hover:bg-primary/40',
-              )}
-            />
+              className="group grid size-6 place-items-center rounded-full"
+            >
+              <span
+                aria-hidden
+                className={cn(
+                  'size-3 rounded-full border border-primary transition-colors',
+                  index === page ? 'bg-primary' : 'group-hover:bg-primary/40',
+                )}
+              />
+            </button>
           ))}
         </div>
       )}

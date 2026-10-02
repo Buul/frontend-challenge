@@ -6,6 +6,7 @@ import { CartMobile } from '@/components/cart/cart-mobile'
 import { PageShell } from '@/components/layout/page-shell'
 import { SiteFooter } from '@/components/layout/site-footer'
 import { SiteHeader } from '@/components/layout/site-header'
+import { SkipLink } from '@/components/layout/skip-link'
 import { RelatedNfts } from '@/components/nft/related-nfts'
 import { RetryAlert } from '@/components/ui/inline-alert'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -103,9 +104,12 @@ function CartPage() {
 
   if (isMobile) {
     return (
-      <main id="conteudo" tabIndex={-1} className="outline-none">
-        {body}
-      </main>
+      <>
+        <SkipLink />
+        <main id="conteudo" tabIndex={-1} className="outline-none">
+          {body}
+        </main>
+      </>
     )
   }
 
