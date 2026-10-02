@@ -13,7 +13,9 @@
     "test:e2e": "playwright test",
     "test:e2e:update": "playwright test --update-snapshots",
     "test:e2e:ui": "playwright test --ui",
-    "lighthouse": "lhci autorun"
+    "lighthouse": "pnpm lighthouse:desktop && pnpm lighthouse:mobile && node scripts/lighthouse-summary.mjs",
+    "lighthouse:desktop": "LHCI_FORM_FACTOR=desktop lhci autorun",
+    "lighthouse:mobile": "LHCI_FORM_FACTOR=mobile lhci autorun"
   },
   "dependencies": {
     "@base-ui/react": "^1.8.0",
