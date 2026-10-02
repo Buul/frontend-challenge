@@ -30,6 +30,16 @@ export type MockScenario =
   | 'realtime-duplicates'
   /** Random price changes are pushed every few seconds, to watch realtime updates by hand. */
   | 'market-live'
+  /** Every API request takes 1.5 s longer, to see skeletons and pending states. */
+  | 'slow-network'
+  /** Each API request waits a random 0–1.2 s, so responses come back out of order. */
+  | 'out-of-order'
+  /** Every API request fails as if the network were down. */
+  | 'network-offline'
+  /** `GET /nfts` finds nothing. */
+  | 'catalog-empty'
+  /** `GET /nfts` answers 503. */
+  | 'catalog-error'
 
 export const isScenarioActive = (scenario: MockScenario) =>
   (localStorage.getItem(SCENARIOS_STORAGE_KEY) ?? '').split(',').map((value) => value.trim()).includes(scenario)
@@ -41,4 +51,15 @@ const DEFAULT_ORDER_SETTLE_MS = 1500
 export function orderSettleDelay() {
   const value = Number(localStorage.getItem(ORDER_SETTLE_DELAY_KEY))
   return Number.isFinite(value) && value >= 0 && localStorage.getItem(ORDER_SETTLE_DELAY_KEY) !== null ? value : DEFAULT_ORDER_SETTLE_MS
+}
+
+/** Extra latency, in ms, added to every API request (on top of each endpoint's own delay). */
+export const LATENCY_KEY = 'kurio:mock:latency-ms'
+
+export function extraLatency() {
+  const fixed = Number(localStorage.getItem(LATENCY_KEY))
+  const base = Number.isFinite(fixed) && fixed > 0 ? fixed : 0
+  const slow = isScenarioActive('slow-network') ? 1500 : 0
+  const jitter = isScenarioActive('out-of-order') ? Math.floor(Math.random() * 1200) : 0
+  return base + slow + jitter
 }

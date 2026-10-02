@@ -42,7 +42,7 @@ import { idempotencyKeys, ordersStore } from './orders-store'
 import { placeOrder, settleDueOrders } from './realtime'
 import { favoritesStore } from './favorites-store'
 import { conflict, notFound, serviceUnavailable, unauthenticated, validationError } from './http'
-import { isScenarioActive } from './scenarios'
+import { extraLatency, isScenarioActive } from './scenarios'
 import { isRecord } from './storage'
 import { readWallets, saveWallet, setWalletMirror, toCollectorWallet } from './wallets-store'
 
@@ -106,6 +106,14 @@ function cartOwner(request: Request) {
 }
 
 export const handlers: RequestHandler[] = [
+  // Network conditions for every endpoint: extra or random latency, or no network at all.
+  // Returning nothing lets the request fall through to the endpoint's own handler.
+  http.all(`${API}/*`, async () => {
+    const latency = extraLatency()
+    if (latency > 0) await delay(latency)
+    if (isScenarioActive('network-offline')) return HttpResponse.error()
+  }),
+
   http.get(`${API}/nfts/featured`, async () => {
     await delay(100)
     // Prices are live (they move with `nft.updated`); the rest of the featured entry is static.
@@ -129,8 +137,12 @@ export const handlers: RequestHandler[] = [
 
   http.get<never, never, NftPage | ApiErrorBody>(`${API}/nfts`, async ({ request }) => {
     await delay(250)
+    if (isScenarioActive('catalog-error')) return serviceUnavailable()
     const { query, errors } = parseListParams(new URL(request.url).searchParams)
     if (Object.keys(errors).length > 0) return validationError(errors)
+    if (isScenarioActive('catalog-empty')) {
+      return HttpResponse.json<NftPage>({ data: [], page: query.page, pageSize: PAGE_SIZE, total: 0, totalPages: 1 })
+    }
 
     const filtered = nfts
       .filter((nft) => !query.q || nft.name.toLocaleLowerCase('pt-BR').includes(query.q))
