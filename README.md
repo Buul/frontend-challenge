@@ -2,6 +2,8 @@
 
 Marketplace de NFTs com catálogo, detalhe, carrinho, pagamento com carteira, recibo e conta do colecionador, em desktop, tablet e mobile. O backend (REST e Socket.IO) é simulado pelo MSW dentro do navegador, então o projeto roda inteiro a partir de um checkout limpo, sem serviços externos.
 
+**Aplicação publicada:** https://frontend-challenge.paulodev.com.br (Vercel, com os mocks e o tempo real rodando no navegador). Contas fictícias: `ana@kurio.dev` / `Kurio@123` e `bruno@kurio.dev` / `Kurio@456`.
+
 Contratos, eventos, sessão, carrinho, cache, reconciliação, decisões de UX, desvios do Figma e limitações estão em [ARCHITECTURE.md](ARCHITECTURE.md).
 
 ## Stack
@@ -132,6 +134,7 @@ Copie `.env.example` para `.env.local`:
 | `pnpm lint`            | Lint com oxlint                                     |
 | `pnpm typecheck`       | Type-check com `tsc -b`                             |
 | `pnpm test:e2e`        | Testes E2E e de regressão visual (1440, 768 e 390)  |
+| `pnpm test:e2e:prod`   | Mesma suíte contra a produção (https://frontend-challenge.paulodev.com.br) |
 | `pnpm test:e2e:update` | Regrava os screenshots de referência                |
 | `pnpm test:e2e:ui`     | Abre o modo UI do Playwright                        |
 | `pnpm lighthouse`      | Lighthouse CI desktop + mobile e resumo das medianas |
@@ -146,6 +149,12 @@ pnpm exec playwright install --with-deps chromium
 ```
 
 Os testes sobem automaticamente `build + preview` na porta 4318 (se já houver um servidor nessa porta, ele é reaproveitado; pare-o antes para testar um build novo). Rodam em Chromium nos projetos `desktop` (1440×900) e `mobile` (390×844), que executam todos os fluxos, e `tablet` (768×1024), que executa as specs sensíveis a layout (visual, acessibilidade, catálogo, detalhe). Geram relatório HTML (`pnpm exec playwright show-report`) e guardam o trace de toda falha. A regressão visual (`e2e/visual.spec.ts`) compara home, detalhe, carrinho e pagamento com as baselines de `e2e/__screenshots__/` nas três larguras; depois de uma mudança visual intencional, rode `pnpm test:e2e:update`.
+
+Para rodar contra uma aplicação já publicada, sem build local, defina `E2E_BASE_URL` (`pnpm test:e2e:prod` já aponta para a produção). Como o MSW roda no navegador, a versão publicada é testada exatamente como a local:
+
+```bash
+E2E_BASE_URL=https://frontend-challenge.paulodev.com.br pnpm exec playwright test
+```
 
 Para reproduzir os fluxos de falha à mão, ative um cenário e recarregue, por exemplo:
 
