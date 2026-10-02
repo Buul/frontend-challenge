@@ -1,6 +1,8 @@
-# Frontend Challenge
+# Kurio · Marketplace de NFTs
 
-Base limpa com a stack abaixo já configurada e integrada, pronta para começar a implementar.
+Marketplace de NFTs com catálogo, detalhe, carrinho, pagamento com carteira, recibo e conta do colecionador, em desktop, tablet e mobile. O backend (REST e Socket.IO) é simulado pelo MSW dentro do navegador, então o projeto roda inteiro a partir de um checkout limpo, sem serviços externos.
+
+Contratos, eventos, sessão, carrinho, cache, reconciliação, decisões de UX, desvios do Figma e limitações estão em [ARCHITECTURE.md](ARCHITECTURE.md).
 
 ## Stack
 
@@ -31,7 +33,10 @@ Acesse <http://localhost:4317>.
 
 - O **MSW** é iniciado no navegador com os handlers de `src/mocks/handlers.ts` (REST) e `src/mocks/realtime.ts` (Socket.IO). Não há backend: o estado do mock (contas, sessões, carrinho, pedidos, preços e estoque) fica no `localStorage`, sob chaves `kurio:mock*`.
 - Cenários do mock são ativados por `localStorage['kurio:mock-scenarios']` (lista separada por vírgula), antes de carregar a página:
-  - Falhas `503`: `favorites-error` (favoritar/desfavoritar), `login-error`, `signup-error`, `cart-error` (alterar o carrinho), `checkout-error` (`POST /orders`), `profile-error` (salvar o perfil) e `wallets-error` (salvar a carteira).
+  - Falhas `503`: `favorites-error` (favoritar/desfavoritar), `login-error`, `signup-error`, `cart-error` (alterar o carrinho), `checkout-error` (`POST /orders`), `profile-error` (salvar o perfil ou o avatar), `wallets-error` (salvar a carteira) e `catalog-error` (`GET /nfts`).
+  - `catalog-empty`: o catálogo não encontra nada.
+  - `slow-network`: toda requisição demora 1,5 s a mais (para ver os skeletons); `out-of-order`: cada requisição espera 0–1,2 s aleatórios, então as respostas chegam fora de ordem; `network-offline`: toda requisição falha como se não houvesse rede. `localStorage['kurio:mock:latency-ms']` soma uma latência fixa.
+  - `checkout-timeout`: `POST /orders` cria o pedido, mas a resposta se perde; o app repete com a mesma `Idempotency-Key` e recupera o pedido, sem comprar duas vezes.
   - `payment-refused`: a carteira recusa o pagamento; o pedido termina `refused` e os NFTs voltam ao carrinho.
   - `realtime-offline`: o servidor Socket.IO recusa conexões; o app mostra o aviso de reconexão e continua tentando.
   - `realtime-duplicates`: todo `nft.updated` é entregue duas vezes.
@@ -51,20 +56,21 @@ Contas fictícias: `ana@kurio.dev` / `Kurio@123` e `bruno@kurio.dev` / `Kurio@45
 | `POST /auth/logout` | `204`, idempotente |
 | `GET /auth/profile` | Exige login. Devolve o perfil do colecionador (`displayName`, `username`, `email`, `ensName`, `ensSuffix`, `walletNickname`); campos ainda não salvos vêm vazios |
 | `PATCH /auth/profile` | Exige login. Atualiza nome, e-mail e perfil. Senha só muda se `currentPassword` e `newPassword` vierem juntos; `422` se a senha atual não conferir, `409` se o e-mail já existir |
+| `PUT /auth/profile/avatar` `{ image }`, `DELETE /auth/profile/avatar` | Exige login. Troca ou remove o avatar (`image` é um data URL PNG, JPEG ou WebP; o app recorta e reduz para 256 px antes de enviar) e devolve o perfil; `422` se a imagem for inválida |
 | `GET /auth/wallets` | Exige login. Devolve `{ primary, secondary, mirrorPrimary }`; carteiras ainda não salvas vêm `null` |
 | `PUT /auth/wallets` | Exige login. `action: "save"` grava a carteira `primary` ou `secondary`; `action: "mirror"` copia a principal para a secundária. `422` se os dados forem inválidos ou se a principal ainda não existir |
 | `GET /favorites`, `PUT`/`DELETE /favorites/:nftId` | `{ data: string[] }` do usuário autenticado, ou `401` |
-| `GET /cart` | `{ items, itemCount, subtotal, discount, networkFee, total, promoCode? }` — o carrinho vive neste navegador e não exige login |
+| `GET /cart` | `{ items, itemCount, subtotal, discount, networkFee, total, promoCode? }` do dono: o usuário autenticado ou, sem token, o visitante deste navegador. Ao entrar ou criar a conta, o carrinho do visitante passa para a conta |
 | `POST /cart/items` `{ nftId, editionId, quantity }` | Soma à linha existente (mesmo NFT e edição), respeitando estoque e o máximo por pedido; `409` se esgotado ou no limite |
 | `PATCH /cart/items` `{ nftId, editionId, quantity }` | Define a quantidade; `0` remove a linha |
-| `POST /cart/promo` `{ code }` | Aplica um código (`KURIO10` dá 10% sobre o subtotal); `409` se o código for inválido |
-| `POST /orders` `{ ...perfil, expectedTotal }` | Exige login. Copia o carrinho para um pedido `pending` (`id`, `status`, `version`, totais, itens), esvazia o carrinho e responde `202`. A carteira simulada responde depois, por `order.updated`: `confirmed` (com `txId`) ou `refused` (com `failureReason`; os itens voltam ao carrinho). `409` se o carrinho estiver vazio ou se `expectedTotal` não for mais o total do carrinho (preço ou estoque mudou), `422` se o perfil for inválido |
+| `POST /cart/promo` `{ code }` | Aplica um código (`KURIO10` dá 10% sobre o subtotal); `409` se o código for inválido ou expirado (`LANCAMENTO20`) |
+| `POST /orders` `{ ...perfil, expectedTotal }` + cabeçalho `Idempotency-Key` | Exige login. Repetir com a mesma chave e o mesmo corpo devolve o mesmo pedido; a mesma chave com outro corpo é `409`. Copia o carrinho para um pedido `pending` (`id`, `status`, `version`, totais, itens), esvazia o carrinho e responde `202`. A carteira simulada responde depois, por `order.updated`: `confirmed` (com `txId`) ou `refused` (com `failureReason`; os itens voltam ao carrinho). `409` se o carrinho estiver vazio ou se `expectedTotal` não for mais o total do carrinho (preço ou estoque mudou), `422` se o perfil for inválido |
 | `GET /orders/:id` | Exige login. O pedido no estado atual; `404` se não existir ou for de outro usuário |
 
 - O token vai em `Authorization: Bearer` e fica em `localStorage['kurio:session-token']`, para sobreviver ao refresh e valer entre abas (diferente de um cookie httpOnly, é legível por scripts, aceitável nesta demo).
 - Login e cadastro são um diálogo aberto por `?auth=login` ou `?auth=signup` em qualquer tela, com `redirect=/caminho` opcional (apenas caminhos internos). Alternar entre os dois substitui a entrada do histórico, mantendo o `redirect`. Ações que exigem login (favoritar) abrem o diálogo e são retomadas ao entrar ou ao criar a conta.
 - Comprar no detalhe adiciona ao carrinho (`/cart`). Visitantes podem montar o carrinho; **Conectar e finalizar** pede login e abre `/checkout`. Quem já entrou vê **Finalizar** e segue direto. No desktop o colecionador preenche o perfil; no mobile escolhe uma carteira salva e a rede. **Confirmar compra** envia o pedido com o total exibido e abre o diálogo em **Confirmando o pagamento**; o pedido fica na URL (`/checkout?order=KR-…`), então um refresh ou uma reconexão retomam o acompanhamento. Quando a carteira responde, o diálogo vira o recibo (com link para o Etherscan) ou **Pagamento recusado**.
-- O perfil do colecionador fica em `/profile`, pelo menu da conta (**Meu perfil**) ou pelo rodapé. Visitante vê o pedido de login. **Salvar** grava nome, usuário, e-mail, ENS e apelido da carteira. A troca de senha só vale quando os três campos são preenchidos. **Carteiras** (`/wallets`) guarda a carteira principal e, se quiser, uma secundária ou a cópia da principal.
+- O perfil do colecionador fica em `/profile`, pelo menu da conta (**Meu perfil**) ou pelo rodapé. Visitante vê o pedido de login. **Salvar** grava nome, usuário, e-mail, ENS e apelido da carteira. **Alterar**/**Remover** salvam o avatar na hora. A troca de senha só vale quando os três campos são preenchidos. **Carteiras** (`/wallets`) guarda a carteira principal e, se quiser, uma secundária ou a cópia da principal.
 - Os formulários de login e cadastro usam TanStack Form, validados por schemas Zod em `src/lib/validation.ts`. O mock valida o corpo das requisições com os mesmos schemas. Regras do cadastro: nome de usuário com 2 a 40 caracteres, e-mail válido, senha com pelo menos 8 caracteres incluindo letras e números, e confirmação igual à senha.
 - Sessão expira em 30 min. Um `401` em requisição autenticada, ou o `expiresAt` vencendo, encerra a sessão e reabre o login sobre a mesma tela. Para simular a expiração no servidor, apague `localStorage['kurio:mock:sessions']`.
 - Dados privados ficam sob a chave de query `['me', userId, ...]`; logout, expiração, troca de usuário e login/logout em outra aba removem essas queries e as mutations pendentes.
@@ -115,7 +121,8 @@ Copie `.env.example` para `.env.local`:
 | `pnpm test:e2e`        | Testes E2E e de regressão visual (desktop e mobile) |
 | `pnpm test:e2e:update` | Regrava os screenshots de referência                |
 | `pnpm test:e2e:ui`     | Abre o modo UI do Playwright                        |
-| `pnpm lighthouse`      | Auditoria Lighthouse CI sobre o build de produção   |
+| `pnpm lighthouse`      | Lighthouse CI desktop + mobile e resumo das medianas |
+| `pnpm lighthouse:desktop` / `pnpm lighthouse:mobile` | Só um dos perfis                     |
 
 ### Playwright
 
@@ -125,11 +132,29 @@ Na primeira execução, instale o navegador:
 pnpm exec playwright install --with-deps chromium
 ```
 
-Os testes sobem automaticamente `build + preview` na porta 4318. Screenshots de referência ficam em `e2e/__screenshots__/`.
+Os testes sobem automaticamente `build + preview` na porta 4318 (se já houver um servidor nessa porta, ele é reaproveitado; pare-o antes para testar um build novo). Rodam em Chromium, nos projetos `desktop` e `mobile`, e geram relatório HTML (`pnpm exec playwright show-report`) e trace na primeira retentativa. A regressão visual (`e2e/visual.spec.ts`) compara home, detalhe, carrinho e pagamento com as baselines de `e2e/__screenshots__/`; depois de uma mudança visual intencional, rode `pnpm test:e2e:update`.
+
+Para reproduzir os fluxos de falha à mão, ative um cenário e recarregue, por exemplo:
+
+```js
+localStorage.setItem('kurio:mock-scenarios', 'checkout-timeout')
+```
+
+Depois, `kurioMock.reset()` limpa tudo.
 
 ### Lighthouse
 
-`pnpm lighthouse` faz o build, sobe o preview e audita `/` no preset desktop. Os relatórios ficam em `.lighthouseci/`. Por padrão usa o Chromium instalado pelo Playwright; defina `CHROME_PATH` para usar outro navegador.
+`pnpm lighthouse` faz o build, sobe o preview e audita `/` e `/nfts/nft-1` nos perfis desktop e mobile, 3 vezes cada, falhando se a mediana ficar abaixo das metas (Performance ≥ 90, Acessibilidade ≥ 95, Boas práticas ≥ 95, SEO ≥ 90). No fim imprime as medianas com LCP, CLS e TBT (`node scripts/lighthouse-summary.mjs` reimprime). Os relatórios ficam em `.lighthouseci/desktop` e `.lighthouseci/mobile`. Por padrão usa o Chromium instalado pelo Playwright; defina `CHROME_PATH` para usar outro navegador. Os resultados e a análise estão em [ARCHITECTURE.md](ARCHITECTURE.md#performance).
+
+## Deploy
+
+O build é estático (`dist/`) e o MSW roda em produção, então qualquer host de arquivos estáticos serve. O que importa é o fallback de SPA, para que acesso direto e refresh em qualquer rota funcionem:
+
+- **Vercel:** `vercel.json` já define o build, o fallback para `index.html` e o cache dos assets. Basta importar o repositório.
+- **Netlify:** `public/_redirects` (copiado para `dist/`) faz o fallback. Build: `pnpm build`; diretório: `dist`.
+- **Cloudflare Pages:** build `pnpm build`, saída `dist`; o fallback de SPA é automático.
+
+`mockServiceWorker.js` precisa ser servido na raiz, o que já acontece porque ele está em `public/`.
 
 ## Estrutura
 
@@ -141,9 +166,11 @@ src/
   lib/socket.ts           Cliente Socket.IO tipado (carregado sob demanda)
   lib/realtime/           Contrato dos eventos e aplicação deles no cache do TanStack Query
   components/realtime/    Conexão do socket, reconciliação e avisos de tempo real
-  mocks/                  Worker e handlers do MSW (REST e Socket.IO)
+  mocks/                  Worker e handlers do MSW (REST e Socket.IO), stores e cenários
   components/ui/          Componentes shadcn/ui
   components/devtools.tsx Devtools do TanStack (apenas em dev)
-e2e/                      Testes Playwright
-lighthouserc.cjs          Configuração do Lighthouse CI
+e2e/                      Testes Playwright (fluxos, tempo real, acessibilidade, visual)
+lighthouserc.cjs          Configuração do Lighthouse CI (perfil por LHCI_FORM_FACTOR)
+scripts/                  Resumo das medianas do Lighthouse
+ARCHITECTURE.md           Contratos, políticas, decisões e limitações
 ```
