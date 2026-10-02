@@ -36,8 +36,9 @@ Acesse <http://localhost:4317>.
   - Falhas `503`: `favorites-error` (favoritar/desfavoritar), `login-error`, `signup-error`, `cart-error` (alterar o carrinho), `checkout-error` (`POST /orders`), `profile-error` (salvar o perfil ou o avatar), `wallets-error` (salvar a carteira) e `catalog-error` (`GET /nfts`).
   - `catalog-empty`: o catálogo não encontra nada.
   - `slow-network`: toda requisição demora 1,5 s a mais (para ver os skeletons); `out-of-order`: cada requisição espera 0–1,2 s aleatórios, então as respostas chegam fora de ordem; `network-offline`: toda requisição falha como se não houvesse rede. `localStorage['kurio:mock:latency-ms']` soma uma latência fixa.
-  - `checkout-timeout`: `POST /orders` cria o pedido, mas a resposta se perde; o app repete com a mesma `Idempotency-Key` e recupera o pedido, sem comprar duas vezes.
+  - `checkout-timeout`: `POST /orders` cria o pedido, mas só responde depois de 60 s, além do timeout de 10 s do app; o app repete com a mesma `Idempotency-Key` e recupera o pedido, sem comprar duas vezes.
   - `payment-refused`: a carteira recusa o pagamento; o pedido termina `refused` e os NFTs voltam ao carrinho.
+  - `wallet-disconnected`: a carteira se desconecta antes de assinar; o pedido termina `refused` com `failureCode: "disconnected"` e os NFTs voltam ao carrinho.
   - `realtime-offline`: o servidor Socket.IO recusa conexões; o app mostra o aviso de reconexão e continua tentando.
   - `realtime-duplicates`: todo `nft.updated` é entregue duas vezes.
   - `market-live`: a cada 8 s o preço de um NFT em destaque muda, para ver o tempo real sem DevTools.
@@ -58,14 +59,15 @@ Contas fictícias: `ana@kurio.dev` / `Kurio@123` e `bruno@kurio.dev` / `Kurio@45
 | `PATCH /auth/profile` | Exige login. Atualiza nome, e-mail e perfil. Senha só muda se `currentPassword` e `newPassword` vierem juntos; `422` se a senha atual não conferir, `409` se o e-mail já existir |
 | `PUT /auth/profile/avatar` `{ image }`, `DELETE /auth/profile/avatar` | Exige login. Troca ou remove o avatar (`image` é um data URL PNG, JPEG ou WebP; o app recorta e reduz para 256 px antes de enviar) e devolve o perfil; `422` se a imagem for inválida |
 | `GET /auth/wallets` | Exige login. Devolve `{ primary, secondary, mirrorPrimary }`; carteiras ainda não salvas vêm `null` |
-| `PUT /auth/wallets` | Exige login. `action: "save"` grava a carteira `primary` ou `secondary`; `action: "mirror"` copia a principal para a secundária. `422` se os dados forem inválidos ou se a principal ainda não existir |
+| `POST /auth/wallets/:slot`, `PUT /auth/wallets/:slot` | Exige login. `slot` é `primary` ou `secondary`. `POST` cria (`201`; `409` se já existe), `PUT` substitui (`404` se ainda não existe); `422` se os dados forem inválidos |
+| `PATCH /auth/wallets` `{ mirrorPrimary }` | Exige login. Faz a secundária repetir a principal (ou deixar de repetir); `422` se a principal ainda não existe |
 | `GET /favorites`, `PUT`/`DELETE /favorites/:nftId` | `{ data: string[] }` do usuário autenticado, ou `401` |
 | `GET /cart` | `{ items, itemCount, subtotal, discount, networkFee, total, promoCode? }` do dono: o usuário autenticado ou, sem token, o visitante deste navegador. Ao entrar ou criar a conta, o carrinho do visitante passa para a conta |
 | `POST /cart/items` `{ nftId, editionId, quantity }` | Soma à linha existente (mesmo NFT e edição), respeitando estoque e o máximo por pedido; `409` se esgotado ou no limite |
 | `PATCH /cart/items` `{ nftId, editionId, quantity }` | Define a quantidade; `0` remove a linha |
 | `POST /cart/promo` `{ code }` | Aplica um código (`KURIO10` dá 10% sobre o subtotal); `409` se o código for inválido ou expirado (`LANCAMENTO20`) |
 | `POST /orders` `{ ...perfil, expectedTotal }` + cabeçalho `Idempotency-Key` | Exige login. Repetir com a mesma chave e o mesmo corpo devolve o mesmo pedido; a mesma chave com outro corpo é `409`. Copia o carrinho para um pedido `pending` (`id`, `status`, `version`, totais, itens), esvazia o carrinho e responde `202`. A carteira simulada responde depois, por `order.updated`: `confirmed` (com `txId`) ou `refused` (com `failureReason`; os itens voltam ao carrinho). `409` se o carrinho estiver vazio ou se `expectedTotal` não for mais o total do carrinho (preço ou estoque mudou), `422` se o perfil for inválido |
-| `GET /orders/:id` | Exige login. O pedido no estado atual; `404` se não existir ou for de outro usuário |
+| `GET /orders/:id` | Exige login. O pedido no estado atual; `404` se não existir, `403` se for de outra conta |
 
 - O token vai em `Authorization: Bearer` e fica em `localStorage['kurio:session-token']`, para sobreviver ao refresh e valer entre abas (diferente de um cookie httpOnly, é legível por scripts, aceitável nesta demo).
 - Login e cadastro são um diálogo aberto por `?auth=login` ou `?auth=signup` em qualquer tela, com `redirect=/caminho` opcional (apenas caminhos internos). Alternar entre os dois substitui a entrada do histórico, mantendo o `redirect`. Ações que exigem login (favoritar) abrem o diálogo e são retomadas ao entrar ou ao criar a conta.
@@ -118,7 +120,7 @@ Copie `.env.example` para `.env.local`:
 | `pnpm preview`         | Serve o build em `:4318`                            |
 | `pnpm lint`            | Lint com oxlint                                     |
 | `pnpm typecheck`       | Type-check com `tsc -b`                             |
-| `pnpm test:e2e`        | Testes E2E e de regressão visual (desktop e mobile) |
+| `pnpm test:e2e`        | Testes E2E e de regressão visual (1440, 768 e 390)  |
 | `pnpm test:e2e:update` | Regrava os screenshots de referência                |
 | `pnpm test:e2e:ui`     | Abre o modo UI do Playwright                        |
 | `pnpm lighthouse`      | Lighthouse CI desktop + mobile e resumo das medianas |
@@ -132,7 +134,7 @@ Na primeira execução, instale o navegador:
 pnpm exec playwright install --with-deps chromium
 ```
 
-Os testes sobem automaticamente `build + preview` na porta 4318 (se já houver um servidor nessa porta, ele é reaproveitado; pare-o antes para testar um build novo). Rodam em Chromium, nos projetos `desktop` e `mobile`, e geram relatório HTML (`pnpm exec playwright show-report`) e trace na primeira retentativa. A regressão visual (`e2e/visual.spec.ts`) compara home, detalhe, carrinho e pagamento com as baselines de `e2e/__screenshots__/`; depois de uma mudança visual intencional, rode `pnpm test:e2e:update`.
+Os testes sobem automaticamente `build + preview` na porta 4318 (se já houver um servidor nessa porta, ele é reaproveitado; pare-o antes para testar um build novo). Rodam em Chromium nos projetos `desktop` (1440×900) e `mobile` (390×844), que executam todos os fluxos, e `tablet` (768×1024), que executa as specs sensíveis a layout (visual, acessibilidade, catálogo, detalhe). Geram relatório HTML (`pnpm exec playwright show-report`) e guardam o trace de toda falha. A regressão visual (`e2e/visual.spec.ts`) compara home, detalhe, carrinho e pagamento com as baselines de `e2e/__screenshots__/` nas três larguras; depois de uma mudança visual intencional, rode `pnpm test:e2e:update`.
 
 Para reproduzir os fluxos de falha à mão, ative um cenário e recarregue, por exemplo:
 

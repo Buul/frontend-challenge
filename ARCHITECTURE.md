@@ -50,11 +50,13 @@ Base: `VITE_API_URL` (padrão `/api`). Corpo JSON. Autenticação: `Authorizatio
 | | `PATCH /cart/items` `{ nftId, editionId, quantity }` | `200 Cart`; `0` remove | `404`, `409` |
 | Preço | `POST /cart/promo` `{ code }` | `200 Cart` com `discount` | `409` código inválido ou expirado |
 | Pedidos | `POST /orders` + `Idempotency-Key` `{ …perfil, expectedTotal }` | `202 Order` `pending`; retentativa com a mesma chave e o mesmo corpo → `200` o mesmo pedido | `401`, `422` sem chave ou perfil inválido, `409` carrinho vazio, total mudou ou chave reutilizada com outro corpo, `503` |
-| | `GET /orders/:id` | `200 Order` no estado atual | `401`, `404` (inexistente ou de outro usuário) |
+| | `GET /orders/:id` | `200 Order` no estado atual | `401`, `403` (pedido de outra conta), `404` |
 | Perfil | `GET /auth/profile`, `PATCH /auth/profile` | `200` | `422` (inclusive senha atual errada), `409` e-mail em uso, `503` |
 | | `PUT /auth/profile/avatar` `{ image }`, `DELETE /auth/profile/avatar` | `200 CollectorProfile` | `422` imagem inválida, `503` |
 | Carteiras | `GET /auth/wallets` | `200 { primary, secondary, mirrorPrimary }` | `401` |
-| | `PUT /auth/wallets` `{ action: 'save', slot, wallet }` ou `{ action: 'mirror', mirrorPrimary }` | `200` | `422`, `503` |
+| | `POST /auth/wallets/:slot` (`primary` ou `secondary`) | `201` com as carteiras | `409` se já existe, `404` slot inválido, `422`, `503` |
+| | `PUT /auth/wallets/:slot` | `200` com as carteiras | `404` se ainda não existe, `422`, `503` |
+| | `PATCH /auth/wallets` `{ mirrorPrimary }` | `200` | `422` sem carteira principal, `503` |
 
 **Preço e totais.** O servidor calcula subtotal, desconto, taxa de rede e total; o cliente só exibe. O `expectedTotal` do pedido é o total que o colecionador viu. Se o preço ou o estoque mudou desde então, o servidor responde `409` antes de mexer no carrinho, e o checkout mostra o total novo para nova confirmação.
 
@@ -97,10 +99,11 @@ Envelope de todo evento ([events.ts](src/lib/realtime/events.ts)):
 
 ## Pedidos
 
-- **Estados.** `pending` → `confirmed` (com `txId`) ou `refused` (com `failureReason`). A carteira simulada responde depois de `kurio:mock:order-settle-ms` (padrão 1,5 s). O cenário `payment-refused` força a recusa, e os itens voltam ao carrinho do dono. Um pedido resolvido nunca muda.
+- **Estados.** `pending` → `confirmed` (com `txId`) ou `refused` (com `failureCode` `rejected` ou `disconnected` e `failureReason`). A carteira simulada responde depois de `kurio:mock:order-settle-ms` (padrão 1,5 s). Os cenários `payment-refused` e `wallet-disconnected` forçam cada tipo de falha, e os itens voltam ao carrinho do dono. Um pedido resolvido nunca muda. O pedido guarda a rede, e o recibo aponta para o explorador dela (Etherscan, Polygonscan ou Solscan).
 - **Recibo imutável.** O pedido copia itens, preços e totais do carrinho no momento da criação. Mudanças posteriores de preço não o alteram.
-- **Idempotência.** O checkout gera uma `Idempotency-Key` por tentativa (mesmos dados → mesma chave; sucesso → chave nova). Falhas transitórias são repetidas duas vezes com a mesma chave. O servidor guarda `chave → { usuário, corpo, pedido }`: repetir devolve o mesmo pedido, e outro corpo com a mesma chave é `409`. O cenário `checkout-timeout` cria o pedido e derruba a resposta, e a retentativa recupera o pedido. Cliques repetidos não duplicam: o botão fica desabilitado, a função ignora chamadas com outra em andamento e a chave cobre o resto.
-- **Recuperação.** O id do pedido vai para a URL (`/checkout?order=KR-…`). Refresh, reconexão ou voltar à página remontam o diálogo a partir de `GET /orders/:id`. Um id de outro usuário dá `404` e é removido da URL.
+- **Idempotência.** O checkout gera uma `Idempotency-Key` por tentativa (mesmos dados → mesma chave; sucesso → chave nova). Falhas transitórias (rede, timeout, 5xx) são repetidas duas vezes com a mesma chave. O servidor guarda `chave → { usuário, corpo, pedido }`: repetir devolve o mesmo pedido, e outro corpo com a mesma chave é `409`. O cenário `checkout-timeout` cria o pedido e só responde depois de 60 s; o timeout de 10 s do axios dispara, e a retentativa recupera o pedido. Cliques repetidos não duplicam: o botão fica desabilitado, a função ignora chamadas com outra em andamento e a chave cobre o resto.
+- **Recuperação.** O id do pedido vai para a URL (`/checkout?order=KR-…`). Refresh, reconexão ou voltar à página remontam o diálogo a partir de `GET /orders/:id`. Um id de outra conta dá `403` ("Este pedido pertence a outra conta") e um inexistente dá `404`; nos dois casos o id sai da URL.
+- **Sessão expirada no pagamento.** O formulário guarda o que foi digitado mesmo se desmontar (o carrinho do visitante aparece enquanto a sessão está expirada), e o carrinho da conta só é descartado se outra pessoa entrar. Quem volta a entrar encontra o pagamento como deixou.
 
 ## Estratégia de cache (TanStack Query)
 
@@ -124,7 +127,7 @@ Loaders de rota pré-carregam as queries da tela (`prefetchQuery`), e os links p
 - **Cenários** (`kurio:mock-scenarios`, separados por vírgula):
   - falhas `503` por recurso;
   - `catalog-empty` e `catalog-error`;
-  - `checkout-timeout` e `payment-refused`;
+  - `checkout-timeout`, `payment-refused` e `wallet-disconnected`;
   - `realtime-offline` e `realtime-duplicates`;
   - `market-live`.
   
@@ -134,23 +137,24 @@ Loaders de rota pré-carregam as queries da tela (`prefetchQuery`), e os links p
 
 ## Testes
 
-Playwright, Chromium, projetos `desktop` (1280×720) e `mobile` (Pixel 7). Cada teste começa num contexto limpo, e cenários, latência e eventos são controlados pelo `localStorage` e pelo `kurioMock`.
+Playwright, Chromium, nas larguras do desafio: `desktop` (1440×900) e `mobile` (390×844) executam todos os fluxos; `tablet` (768×1024) executa as specs sensíveis a layout (visual, acessibilidade, catálogo, detalhe). Cada teste começa num contexto limpo, e cenários, latência e eventos são controlados pelo `localStorage` e pelo `kurioMock`; o relógio é controlado com `page.clock` onde o tempo decide (expiração da sessão por `expiresAt`). Toda falha guarda o trace, e os passos do fluxo de compra ficam em `e2e/flows.ts`.
 
 | Grupo pedido | Onde |
 | --- | --- |
 | 1. Busca, filtros combinados, ordenação, paginação, histórico | `catalog.spec.ts` |
 | 2. Acesso direto ao detalhe e recurso inexistente | `nft-detail.spec.ts` |
-| 3. Cadastro, login, expiração, logout, troca de usuário | `auth.spec.ts` |
+| 3. Cadastro, login, expiração (inclusive por relógio e no meio do pagamento), logout, troca de usuário | `auth.spec.ts`, `checkout.spec.ts` |
 | 4. Favoritos com falha e recuperação | `favorites.spec.ts` |
 | 5. Carrinho: quantidades, remoção, cupons, persistência, merge, isolamento | `cart.spec.ts` |
 | 6. Compra do catálogo ao recibo | `checkout.spec.ts`, `realtime.spec.ts` |
-| 7. Falha de pagamento, cliques repetidos, timeout | `checkout.spec.ts`, `realtime.spec.ts` (recusa) |
-| 8. Perfil, avatar, senha e carteiras com erros | `profile.spec.ts`, `wallets.spec.ts` |
+| 7. Falha de pagamento, cliques repetidos, timeout | `checkout.spec.ts`, `realtime.spec.ts` (recusa, carteira desconectada) |
+| 8. Perfil, avatar, senha e carteiras (principal, secundária, espelho, contrato REST) com erros | `profile.spec.ts`, `wallets.spec.ts` |
 | 9. Preço e estoque via Socket.IO durante o checkout | `realtime.spec.ts` |
-| 10. Duplicados, atrasados, desconexão, pedido pendente | `realtime.spec.ts` |
-| 11. Teclado, foco em diálogos, validação | `a11y.spec.ts`, `auth.spec.ts`, `profile.spec.ts` |
-| 12. Skeletons, erro e retry | `catalog.spec.ts`, `favorites.spec.ts` |
-| Regressão visual: home, detalhe, carrinho, pagamento | `visual.spec.ts` (baselines em `e2e/__screenshots__/`) |
+| 10. Duplicados (eventos e cenário), atrasados, desconexão, servidor offline, pedido pendente | `realtime.spec.ts` |
+| 11. Teclado, foco em diálogos (login e recibo), validação com erro associado ao campo | `a11y.spec.ts`, `auth.spec.ts`, `checkout.spec.ts`, `profile.spec.ts` |
+| 12. Skeletons, erro, rede offline, respostas fora de ordem e retry | `catalog.spec.ts`, `favorites.spec.ts` |
+| Também | Ações do card no hover, galeria, abas, compartilhar, newsletter | `catalog.spec.ts`, `nft-detail.spec.ts` |
+| Regressão visual: home, detalhe, carrinho, pagamento | `visual.spec.ts`, em 1440, 768 e 390 (baselines em `e2e/__screenshots__/`) |
 
 ## Performance
 
@@ -177,10 +181,22 @@ No mobile, a margem é pequena (90–91). O LCP fica em ~3,3 s porque o app só 
 
 - **Navegação:** skip link em todas as telas (inclusive as mobile sem header), foco visível em todos os controles, `main#conteudo` focável.
 - **Diálogos:** login, cadastro e recibo prendem o foco e o devolvem ao fechar.
-- **Formulários:** erros associados por `aria-describedby`/`aria-invalid` e foco no primeiro campo inválido.
+- **Formulários:** todo campo associa seu erro ao controle por `aria-describedby` e marca `aria-invalid` (perfil, carteiras e pagamento pelo `FormField` compartilhado; login e cadastro pelos campos de `auth-form-parts`, com o visual próprio do diálogo); no envio inválido o foco vai ao primeiro campo com erro.
 - **Anúncios:** regiões `role=status`/`alert` para resultados de busca, mutations, mudanças em tempo real e estados do pedido.
 - **Imagens e estados:** imagens com texto alternativo (decorativas com `alt=""`). Estados não dependem só de cor: edição esgotada tem "(esgotada)" e `disabled`, e botões ativos usam `aria-pressed`/`aria-current`.
 - **Toque, movimento e reflow:** alvos de toque de 24 px (pontos de carrosséis e da galeria), `prefers-reduced-motion` desliga shimmer e transições, e não há rolagem horizontal a 320 px (zoom de 400%), coberto por teste.
+
+## Componentes compartilhados
+
+| Componente | Onde fica | Usado por |
+| --- | --- | --- |
+| `FormField`, `TextField`, `SelectField`, `EnsField`, `PasswordField` | `components/ui/form-field.tsx` | Perfil, carteiras e pagamento (duas variantes de layout do design: `account` e `checkout`) |
+| `fieldProps` | `lib/forms.ts` | Liga um campo do TanStack Form aos componentes acima numa linha |
+| `Breadcrumb` | `components/layout/breadcrumb.tsx` | Detalhe, carrinho e pagamento |
+| `BackButton` | `components/ui/back-button.tsx` | Detalhe, carrinho e pagamento no mobile (inclusive nos skeletons) |
+| `SignInRequired` | `components/auth/sign-in-required.tsx` | Perfil e carteiras para visitantes |
+| `CardActions` | `components/home/card-actions.tsx` | Cards do catálogo no desktop |
+| Passos do fluxo de compra | `e2e/flows.ts` | Specs de carrinho, pagamento, tempo real, visual e acessibilidade |
 
 ## Decisões de UX
 
@@ -189,11 +205,12 @@ No mobile, a margem é pequena (90–91). O LCP fica em ~3,3 s porque o app só 
 - **Mudanças ao vivo são explicadas:** preço que muda no detalhe ou no carrinho, item que esgota e total que muda no checkout geram um aviso. O total só é aceito se for o mostrado (`expectedTotal`).
 - **O pagamento tem estados visíveis:** "Confirmando o pagamento", recibo, ou "Pagamento recusado" com o carrinho restaurado e o botão "Revisar e tentar de novo".
 - **Avatar imediato:** o avatar é salvo na hora (Alterar/Remover), sem depender do "Salvar" do formulário. A imagem é recortada em quadrado e reduzida a 256 px no navegador.
+- **Ações rápidas no card (desktop):** adicionar ao carrinho (a primeira edição à venda), favoritar e abrir o detalhe aparecem no hover, como no Figma, e também com o foco do teclado; o resultado é anunciado.
 - **Skeletons:** os skeletons ocupam o tamanho final, então não há layout shift.
 
 ## Desvios do Figma
 
-- **Telas sem Figma:** o tablet (768) não tem tela própria no Figma. O layout é derivado do mobile e do desktop: abaixo de 1440 os grids passam a colunas fluidas, e a largura fixa dos cards só vale a 1440. Os estados de pedido pendente e recusado, o aviso de offline e os toasts também não existem no Figma e seguem a mesma linguagem visual.
+- **Telas sem Figma:** o tablet (768) não tem tela própria no Figma. O layout é derivado do mobile e do desktop: abaixo de 1440 os grids passam a colunas fluidas (a largura fixa dos cards só vale a 1440), e abaixo de 1024 o logo perde a largura fixa que centraliza o menu no desktop, e a busca aberta ocupa o lugar do menu. Os estados de pedido pendente, recusado e carteira desconectada, o aviso de offline e os toasts também não existem no Figma e seguem a mesma linguagem visual.
 - **Pontos dos carrosséis e da galeria:** os pontos de relacionados (12 px) e da galeria do detalhe mobile (7 px) mantêm o tamanho, mas cada um fica numa área de toque de 24 px (WCAG 2.5.8), então o espaçamento entre eles aumenta.
 - **Footer:** Perfil e Carteiras mantêm o footer, que o Figma não mostra, porque ele traz links de navegação da conta.
 - **Nome ENS no pagamento:** usa a mesma ordem do Perfil e das Carteiras (sufixo `.eth` antes do nome).
@@ -203,6 +220,5 @@ No mobile, a margem é pequena (90–91). O LCP fica em ~3,3 s porque o app só 
 - **O backend é o navegador.** Cada aba roda sua própria instância do MSW: o estado é compartilhado pelo `localStorage`, mas um evento emitido numa aba não chega a outra. Ela vê a mudança na próxima leitura REST.
 - **Sem cookies:** como o mock não usa cookies, o `tldts` real foi trocado por um `getDomain` simplificado.
 - **Senhas e avatares:** as senhas são guardadas como hash PBKDF2 no `localStorage`, e os avatares como data URL de ~20 kB.
-- **Carteiras:** usam `PUT /auth/wallets` com `action` em vez de recursos separados por carteira.
 - **Um carrinho de visitante por navegador.**
 - **Visual regression:** as baselines foram geradas no macOS. Em outro sistema, regenere com `pnpm test:e2e:update`, porque a fonte renderiza diferente.
