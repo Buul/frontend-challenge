@@ -24,18 +24,22 @@ import {
   type SessionInfo,
   type SignupRequest,
   type CollectorProfile,
+  type CollectorWallets,
+  type WalletUpdateRequest,
 } from '@/lib/api/types'
 import type { ApiErrorBody } from '@/lib/api/errors'
 import { compareEth, isEthAmount } from '@/lib/eth'
 import { shortenAddress } from '@/lib/format'
 import type { CheckoutRequest } from '@/lib/api/orders'
-import { cartItemSchema, cartPromoSchema, cartQuantitySchema, checkoutSchema, EMAIL_PATTERN, loginSchema, profileUpdateSchema, signupSchema, toFieldErrors } from '@/lib/validation'
+import { cartItemSchema, cartPromoSchema, cartQuantitySchema, checkoutSchema, EMAIL_PATTERN, loginSchema, profileUpdateSchema, signupSchema, toFieldErrors, walletSchema } from '@/lib/validation'
 import { authenticate, collectorProfile, registerUser, sessionStore, toPublicUser, updateCollectorProfile, verifyCredentials } from './auth'
 import { cartStore } from './cart-store'
 import { featuredNfts, nftDetails, nfts, relatedNfts } from './data'
 import { favoritesStore } from './favorites-store'
 import { conflict, notFound, serviceUnavailable, unauthenticated, validationError } from './http'
 import { isScenarioActive } from './scenarios'
+import { isRecord } from './storage'
+import { readWallets, saveWallet, setWalletMirror, toCollectorWallet } from './wallets-store'
 
 const API = import.meta.env.VITE_API_URL ?? '/api'
 const PAGE_SIZE = 9
@@ -327,6 +331,46 @@ export const handlers: RequestHandler[] = [
       return HttpResponse.json<FavoriteList>({ data: ids })
     }),
   ),
+
+  http.get<never, never, CollectorWallets | ApiErrorBody>(`${API}/auth/wallets`, async ({ request }) => {
+    await delay(200)
+    const session = authenticate(request)
+    if (!session) return unauthenticated()
+    return HttpResponse.json<CollectorWallets>(readWallets(session.user.id))
+  }),
+
+  http.put<never, WalletUpdateRequest, CollectorWallets | ApiErrorBody>(`${API}/auth/wallets`, async ({ request }) => {
+    await delay(400)
+    if (isScenarioActive('wallets-error')) return serviceUnavailable()
+    const session = authenticate(request)
+    if (!session) return unauthenticated()
+
+    const body: unknown = await request.json().catch(() => null)
+    if (!isRecord(body)) return validationError({ action: 'Informe a ação.' }, 'Verifique os dados informados.')
+
+    if (body.action === 'mirror') {
+      if (typeof body.mirrorPrimary !== 'boolean') {
+        return validationError({ mirrorPrimary: 'Informe se a carteira secundária repete a principal.' }, 'Verifique os dados informados.')
+      }
+      const result = setWalletMirror(session.user.id, body.mirrorPrimary)
+      if (result === 'missing-primary') {
+        const message = 'Salve a carteira principal antes de copiá-la.'
+        return validationError({ mirrorPrimary: message }, message)
+      }
+      return HttpResponse.json<CollectorWallets>(result)
+    }
+
+    if (body.action !== 'save' || (body.slot !== 'primary' && body.slot !== 'secondary')) {
+      return validationError({ action: 'Informe a carteira a salvar.' }, 'Verifique os dados informados.')
+    }
+
+    const parsed = walletSchema.safeParse(body.wallet)
+    if (!parsed.success) return validationError(toFieldErrors(parsed.error), 'Verifique os dados informados.')
+    const wallet = toCollectorWallet(parsed.data)
+    if (!wallet) return validationError({ walletType: 'Selecione uma carteira.' }, 'Verifique os dados informados.')
+
+    return HttpResponse.json<CollectorWallets>(saveWallet(session.user.id, body.slot, wallet))
+  }),
 
   http.post(`${API}/newsletter`, async ({ request }) => {
     await delay(400)

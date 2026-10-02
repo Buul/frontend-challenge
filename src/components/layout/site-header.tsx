@@ -36,7 +36,7 @@ const navItemClass = (active: boolean) =>
   )
 
 function HeaderSearch() {
-  const onSubmit = useSearchSubmit()
+  const onSubmit = useSearchSubmit({ scrollToMarket: false })
   const { q } = useSearch({ strict: false })
   const [open, setOpen] = useState(Boolean(q))
   const toggle = useRef<HTMLButtonElement>(null)

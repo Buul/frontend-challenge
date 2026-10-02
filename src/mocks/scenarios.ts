@@ -18,6 +18,8 @@ export type MockScenario =
   | 'checkout-error'
   /** `PATCH /auth/profile` answers 503. */
   | 'profile-error'
+  /** `PUT /auth/wallets` answers 503. */
+  | 'wallets-error'
 
 export const isScenarioActive = (scenario: MockScenario) =>
   (localStorage.getItem(SCENARIOS_STORAGE_KEY) ?? '').split(',').map((value) => value.trim()).includes(scenario)

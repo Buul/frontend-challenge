@@ -1,21 +1,12 @@
 import { useForm } from '@tanstack/react-form'
-import { Link, useNavigate } from '@tanstack/react-router'
+import { useNavigate } from '@tanstack/react-router'
 import { useEffect, useRef, useState, type ChangeEvent, type ReactNode } from 'react'
 import hideIcon from '@/assets/figma/profile-hide.svg'
 import imageIcon from '@/assets/figma/profile-image.svg'
-import activityIcon from '@/assets/figma/profile-activity.svg'
 import arrowIcon from '@/assets/figma/profile-arrow.svg'
-import dangerIcon from '@/assets/figma/profile-danger.svg'
-import downloadIcon from '@/assets/figma/profile-download.svg'
-import heartIcon from '@/assets/figma/profile-heart.svg'
-import locationIcon from '@/assets/figma/profile-location.svg'
-import logoutIcon from '@/assets/figma/profile-logout.svg'
-import shoppingIcon from '@/assets/figma/profile-shopping.svg'
-import userIcon from '@/assets/figma/profile-user.svg'
+import { AccountSidebar } from '@/components/profile/account-sidebar'
 import { InlineAlert, RetryAlert } from '@/components/ui/inline-alert'
-import { Sheet, SheetClose, SheetContent, SheetTitle, SheetTrigger } from '@/components/ui/sheet'
 import { Skeleton } from '@/components/ui/skeleton'
-import { useIsMobile } from '@/hooks/use-media-query'
 import { useLogout, useSession } from '@/lib/api/auth'
 import { ApiError, getErrorMessage } from '@/lib/api/errors'
 import { useCollectorProfile, useUpdateProfile } from '@/lib/api/profile'
@@ -53,16 +44,6 @@ type ProfileValues = {
 
 const controlClass =
   'h-10 w-full rounded-[3px] border border-border bg-transparent px-3 text-[15px] leading-[15px] text-foreground outline-none focus-visible:border-primary aria-invalid:border-coral'
-
-const NAV = [
-  { id: 'profile', label: 'Dados do perfil', icon: userIcon, width: 18, height: 18, gap: 'gap-4' },
-  { id: 'wallets', label: 'Carteiras', icon: locationIcon, width: 13.7497, height: 16.2502, gap: 'gap-3' },
-  { id: 'activity', label: 'Atividade', icon: shoppingIcon, width: 18, height: 18, gap: 'gap-3' },
-  { id: 'watchlist', label: 'Lista de interesse', icon: heartIcon, width: 16, height: 16, gap: 'gap-3' },
-  { id: 'offers', label: 'Ofertas', icon: activityIcon, width: 15.8547, height: 15.9022, gap: 'gap-3' },
-  { id: 'downloads', label: 'Arquivos baixados', icon: downloadIcon, width: 15.375, height: 15.4565, gap: 'gap-3' },
-  { id: 'support', label: 'Suporte', icon: dangerIcon, width: 15.7499, height: 15, gap: 'gap-3' },
-] as const
 
 export function ProfileScreen() {
   const { user, isPending } = useSession()
@@ -156,7 +137,7 @@ function ProfileEditor({ userId, profile }: { userId: string; profile: Collector
 
   return (
     <div className="flex flex-col gap-6 min-[1440px]:flex-row min-[1440px]:items-start min-[1440px]:gap-7">
-      <ProfileSidebar onLogout={onLogout} logoutPending={logout.isPending} />
+      <AccountSidebar active="profile" onLogout={onLogout} logoutPending={logout.isPending} />
       <form
         noValidate
         aria-busy={update.isPending}
@@ -366,88 +347,6 @@ function ProfileEditor({ userId, profile }: { userId: string; profile: Collector
       </form>
     </div>
   )
-}
-
-function ProfileSidebar({ onLogout, logoutPending }: { onLogout: () => void; logoutPending: boolean }) {
-  const isMobile = useIsMobile()
-
-  if (isMobile) {
-    return (
-      <Sheet>
-        <SheetTrigger className="flex h-12 w-full items-center justify-between gap-3 bg-card px-4 text-left">
-          <span className="text-lg leading-4 font-bold">Meu perfil</span>
-          <span className="flex min-w-0 items-center gap-2 text-[15px] leading-[15px] text-brand">
-            <span className="truncate">Dados do perfil</span>
-            <img src={arrowIcon} alt="" width={20} height={20} className="shrink-0" />
-          </span>
-        </SheetTrigger>
-        <SheetContent className="pb-[max(1.5rem,env(safe-area-inset-bottom))]">
-          <div className="sticky top-0 z-10 flex items-center justify-between bg-card px-4 pt-5 pb-2">
-            <SheetTitle className="leading-4">Meu perfil</SheetTitle>
-            <SheetClose className="rounded-sm text-sm font-bold text-brand">Fechar</SheetClose>
-          </div>
-          <AccountNav />
-          <div className="hairline-b" />
-          <LogoutButton onLogout={onLogout} pending={logoutPending} />
-        </SheetContent>
-      </Sheet>
-    )
-  }
-
-  return (
-    <aside className="w-full shrink-0 bg-card py-2 min-[1440px]:w-[310px]">
-      <h2 className="px-2.5 py-2.5 text-lg leading-4 font-bold">Meu perfil</h2>
-      <AccountNav />
-      <div className="hairline-b" />
-      <LogoutButton onLogout={onLogout} pending={logoutPending} />
-    </aside>
-  )
-}
-
-function AccountNav() {
-  return (
-    <nav aria-label="Conta">
-      <ul>
-        {NAV.map((item) => (
-          <li key={item.id}>
-            {item.id === 'profile' ? (
-              <Link
-                to="/profile"
-                aria-current="page"
-                className={cn('flex items-center border-l-[6px] border-primary px-4 text-[15px] leading-[45px] text-brand', item.gap)}
-              >
-                <NavIcon src={item.icon} width={item.width} height={item.height} />
-                {item.label}
-              </Link>
-            ) : (
-              <span className={cn('flex items-center px-4 text-[15px] leading-[45px] text-brand', item.gap)}>
-                <NavIcon src={item.icon} width={item.width} height={item.height} />
-                {item.label}
-              </span>
-            )}
-          </li>
-        ))}
-      </ul>
-    </nav>
-  )
-}
-
-function LogoutButton({ onLogout, pending }: { onLogout: () => void; pending: boolean }) {
-  return (
-    <button
-      type="button"
-      onClick={onLogout}
-      disabled={pending}
-      className="flex h-10 w-full items-center gap-2 px-4 text-[15px] leading-[15px] font-bold text-brand disabled:opacity-60"
-    >
-      <img src={logoutIcon} alt="" width={17.7779} height={16.9167} />
-      Sair
-    </button>
-  )
-}
-
-function NavIcon({ src, width, height }: { src: string; width: number; height: number }) {
-  return <img src={src} alt="" width={width} height={height} className="shrink-0" />
 }
 
 function Field({

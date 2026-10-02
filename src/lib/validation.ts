@@ -128,6 +128,35 @@ export const checkoutSchema = z.object({
   notes: z.string().trim().max(280, 'Use até 280 caracteres na observação.'),
 })
 
+/** Body of `PUT /auth/wallets` when saving the primary or secondary wallet. */
+export const walletSchema = z.object({
+  displayName,
+  walletNickname,
+  network: oneOf(NETWORKS.map(({ id }) => id), 'Selecione uma rede.'),
+  profileName: z
+    .string({ error: 'Informe o nome do perfil.' })
+    .trim()
+    .min(1, { error: 'Informe o nome do perfil.', abort: true })
+    .min(2, 'Use de 2 a 40 caracteres no nome do perfil.')
+    .max(40, 'Use de 2 a 40 caracteres no nome do perfil.'),
+  walletAddress: z
+    .string({ error: 'Informe o endereço da carteira.' })
+    .trim()
+    .min(1, { error: 'Informe o endereço da carteira.', abort: true })
+    .regex(WALLET_ADDRESS, 'Informe um endereço 0x ou um nome ENS, como nome.eth.'),
+  secondaryAddress: z.string().trim().max(80, 'Use até 80 caracteres na carteira secundária.'),
+  walletType: oneOf(WALLETS.map(({ id }) => id), 'Selecione uma carteira.'),
+  referralCode: z
+    .string({ error: 'Informe o código de indicação.' })
+    .trim()
+    .min(1, { error: 'Informe o código de indicação.', abort: true })
+    .max(32, 'Use até 32 caracteres no código.')
+    .regex(/^[A-Za-z0-9]+$/, 'Use só letras e números no código.'),
+  email,
+  ensName,
+  ensSuffix,
+})
+
 /** Body of `PATCH /auth/profile`. An empty password pair means the password stays as it is. */
 export const profileSchema = z.object({
   displayName,

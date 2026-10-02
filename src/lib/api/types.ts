@@ -215,6 +215,32 @@ export type ProfileUpdateResponse = {
   profile: CollectorProfile
 }
 
+/** A wallet the collector can use at checkout and to receive purchased NFTs. */
+export type CollectorWallet = {
+  displayName: string
+  walletNickname: string
+  network: NetworkId
+  profileName: string
+  walletAddress: string
+  secondaryAddress: string
+  walletType: WalletId
+  referralCode: string
+  email: string
+  ensName: string
+  ensSuffix: EnsSuffix
+}
+
+export type CollectorWallets = {
+  primary: CollectorWallet | null
+  secondary: CollectorWallet | null
+  /** When true, the secondary wallet is a copy of the primary one. */
+  mirrorPrimary: boolean
+}
+
+export type WalletUpdateRequest =
+  | { action: 'save'; slot: 'primary' | 'secondary'; wallet: CollectorWallet }
+  | { action: 'mirror'; mirrorPrimary: boolean }
+
 export type LoginRequest = {
   email: string
   password: string
