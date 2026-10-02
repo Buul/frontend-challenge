@@ -164,14 +164,24 @@ function CartDesktopSkeleton() {
 
 function CartMobileSkeleton({ onBack }: { onBack: () => void }) {
   return (
-    <div className="flex flex-col gap-3 px-7 pt-8">
-      {/* Going back works while the cart loads; only the placeholders are hidden from assistive tech. */}
-      <div className="flex h-11 items-center">
-        <BackButton onClick={onBack} />
+    <div className="flex min-h-dvh flex-col">
+      <div className="flex flex-col gap-3 px-7 pt-8">
+        {/* Going back works while the cart loads; only the placeholders are hidden from assistive tech. */}
+        <div className="flex h-11 items-center">
+          <BackButton onClick={onBack} />
+        </div>
+        {Array.from({ length: 3 }, (_, index) => (
+          <Skeleton key={index} className="h-[100px] w-full rounded-[14px]" />
+        ))}
       </div>
-      {Array.from({ length: 3 }, (_, index) => (
-        <Skeleton key={index} className="h-[100px] w-full rounded-[14px]" />
-      ))}
+      {/* Same panel as the summary (coupon, values, button), so nothing moves when it loads. */}
+      <div aria-hidden className="mt-4 flex flex-1 flex-col gap-4 rounded-t-[40px] bg-card px-6 pt-6 pb-[36px]">
+        <Skeleton className="h-[50px] w-full rounded-[40px] bg-surface-raised" />
+        {Array.from({ length: 4 }, (_, index) => (
+          <Skeleton key={index} className="h-4 w-full bg-surface-raised" />
+        ))}
+        <Skeleton className="mt-auto h-[60px] w-full rounded-[40px] bg-surface-raised" />
+      </div>
     </div>
   )
 }
