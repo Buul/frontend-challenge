@@ -21,6 +21,7 @@ import type { SessionInfo, WalletId } from '@/lib/api/types'
 import { compareEth } from '@/lib/eth'
 import { formatEth } from '@/lib/format'
 import { useAuthDialog } from '@/lib/auth/auth-dialog'
+import { requireSession } from '@/lib/auth/require-session'
 import { sessionToken } from '@/lib/auth/session-token'
 
 const QUOTE_CHANGED = 'Os preços ou a disponibilidade mudaram. Revise o novo total antes de confirmar.'
@@ -33,6 +34,8 @@ export const Route = createFileRoute('/checkout')({
   validateSearch: (search: Record<string, unknown>): { order?: string } => ({
     order: typeof search.order === 'string' && ORDER_ID.test(search.order) ? search.order : undefined,
   }),
+  // Paying (and following an order) needs an account; visitors sign in from the cart and come back here.
+  beforeLoad: (args) => requireSession(args, { fallback: '/cart', notice: 'Entre para finalizar a compra.' }),
   loader: ({ context }) => {
     void context.queryClient.prefetchQuery(cartQueryOptions())
   },

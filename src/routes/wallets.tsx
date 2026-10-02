@@ -6,8 +6,10 @@ import { SiteHeader } from '@/components/layout/site-header'
 import { SkipLink } from '@/components/layout/skip-link'
 import { WalletsScreen } from '@/components/profile/wallets-screen'
 import { useIsMobile } from '@/hooks/use-media-query'
+import { requireSession } from '@/lib/auth/require-session'
 
 export const Route = createFileRoute('/wallets')({
+  beforeLoad: (args) => requireSession(args, { fallback: '/', notice: 'Entre para ver as suas carteiras.' }),
   component: WalletsPage,
 })
 
