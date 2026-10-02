@@ -44,23 +44,42 @@ export async function clearPrivateData(queryClient: QueryClient) {
   mutations.findAll({ mutationKey: PRIVATE_ROOT }).forEach((mutation) => mutations.remove(mutation))
 }
 
+// Whose cart the cache holds: a user id, '' for the visitor, `undefined` when unknown.
+let cartOwner: string | undefined
+
+/** Drops the cached cart and refetches it, for an identity change whose new owner is unknown (e.g. another tab). */
+export function resetCart(queryClient: QueryClient) {
+  cartOwner = undefined
+  return queryClient.resetQueries({ queryKey: cartKeys.current })
+}
+
 /**
- * The cart belongs to whoever is signed in (or to the visitor), so it is refetched whenever the identity changes.
+ * The cart belongs to whoever is signed in (or to the visitor). When its owner changes it is dropped and refetched,
+ * so nobody sees the previous owner's items; when the same person signs back in (after an expired session) it is
+ * only revalidated, so screens built on it, like a half-filled checkout, stay as they were.
  * Call it after the token changed, so the refetch speaks for the new identity.
  */
-export function resetCart(queryClient: QueryClient) {
-  return queryClient.resetQueries({ queryKey: cartKeys.current })
+function syncCart(queryClient: QueryClient, owner: string) {
+  const sameOwner = cartOwner === owner
+  cartOwner = owner
+  return sameOwner ? queryClient.invalidateQueries({ queryKey: cartKeys.current }) : queryClient.resetQueries({ queryKey: cartKeys.current })
 }
 
 /** Id of the signed-in user according to the cache; late mutation callbacks use it to avoid writing into another user's data. */
 export const currentUserId = (queryClient: QueryClient) =>
   queryClient.getQueryData<SessionInfo | null>(sessionKeys.current)?.user.id
 
-export async function endSession(queryClient: QueryClient) {
+/**
+ * Ends the session locally. On logout the browser goes back to the visitor's cart; when the session merely expired the
+ * cart stays on screen, since the same person is expected to sign back in (`syncCart` resets it if someone else does).
+ */
+export async function endSession(queryClient: QueryClient, { expired = false } = {}) {
+  const owner = currentUserId(queryClient)
   sessionToken.clear()
   await clearPrivateData(queryClient)
   queryClient.setQueryData(sessionKeys.current, null)
-  void resetCart(queryClient)
+  if (expired) cartOwner = owner
+  else void syncCart(queryClient, '')
 }
 
 async function startSession(queryClient: QueryClient, { token, ...session }: Session) {
@@ -68,7 +87,7 @@ async function startSession(queryClient: QueryClient, { token, ...session }: Ses
   sessionToken.set(token)
   queryClient.setQueryData(sessionKeys.current, session)
   // The server moved the visitor's cart into the account on login; show the account's cart.
-  void resetCart(queryClient)
+  void syncCart(queryClient, session.user.id)
 }
 
 export function useLogin() {

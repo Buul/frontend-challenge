@@ -14,7 +14,7 @@ export function SessionSync() {
   const expiresAt = session?.expiresAt
 
   const expire = useCallback(() => {
-    void endSession(queryClient)
+    void endSession(queryClient, { expired: true })
     open({ notice: SESSION_EXPIRED_NOTICE })
   }, [queryClient, open])
 

@@ -1,6 +1,6 @@
 import { useForm } from '@tanstack/react-form'
 import { Link } from '@tanstack/react-router'
-import { useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import radioRing from '@/assets/figma/radio-ring.svg'
 import { RadioMark } from '@/components/checkout/radio-mark'
 import { Breadcrumb } from '@/components/layout/breadcrumb'
@@ -30,7 +30,7 @@ const FIELDS = [
 
 type FieldName = (typeof FIELDS)[number]
 
-type CheckoutValues = {
+export type CheckoutDraft = {
   displayName: string
   username: string
   network: string
@@ -48,17 +48,21 @@ type CheckoutValues = {
 
 type CheckoutDesktopProps = {
   user?: User
+  /** What was typed before the form last unmounted (e.g. while the session expired), restored as the starting values. */
+  draft?: CheckoutDraft
+  onDraft?: (values: CheckoutDraft) => void
   cart: Cart
   pending?: boolean
   notice?: string
   onSubmit: (input: CheckoutRequest) => Promise<void>
 }
 
-export function CheckoutDesktop({ user, cart, pending, notice, onSubmit }: CheckoutDesktopProps) {
+export function CheckoutDesktop({ user, draft, onDraft, cart, pending, notice, onSubmit }: CheckoutDesktopProps) {
   const refs = useRef<Partial<Record<FieldName, HTMLElement | null>>>({})
   const focus = (field?: FieldName) => field && refs.current[field]?.focus()
 
-  const defaultValues: CheckoutValues = {
+  // Taken once: the session briefly goes away when it expires, and new defaults would wipe what was typed.
+  const [defaultValues] = useState<CheckoutDraft>(() => draft ?? {
     displayName: user?.name ?? '',
     username: '',
     network: '',
@@ -72,7 +76,7 @@ export function CheckoutDesktop({ user, cart, pending, notice, onSubmit }: Check
     ensSuffix: 'eth',
     useOtherWallet: false,
     notes: '',
-  }
+  })
 
   const form = useForm({
     defaultValues,
@@ -88,6 +92,9 @@ export function CheckoutDesktop({ user, cart, pending, notice, onSubmit }: Check
       }
     },
   })
+
+  // Hands what was typed to the page when the form goes away, so it can come back filled.
+  useEffect(() => () => onDraft?.(form.state.values), [form, onDraft])
 
   const bind = (name: FieldName) => (node: HTMLElement | null) => {
     refs.current[name] = node

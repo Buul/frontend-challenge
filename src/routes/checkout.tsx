@@ -1,7 +1,7 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { createFileRoute, Link, useCanGoBack, useRouter } from '@tanstack/react-router'
 import { useEffect, useRef, useState } from 'react'
-import { CheckoutDesktop } from '@/components/checkout/checkout-desktop'
+import { CheckoutDesktop, type CheckoutDraft } from '@/components/checkout/checkout-desktop'
 import { CheckoutMobile } from '@/components/checkout/checkout-mobile'
 import { OrderDialog } from '@/components/checkout/order-dialog'
 import { checkoutFromWallet, type SavedWallet } from '@/components/checkout/wallets'
@@ -51,6 +51,9 @@ function CheckoutPage() {
   const { open: openLogin } = useAuthDialog()
   const [notice, setNotice] = useState<string>()
   const [attemptKeys] = useState(createAttemptKeys)
+  // The payment form can unmount mid-way (an expired session shows the visitor's empty cart): keep what was typed,
+  // which also pre-fills a next purchase in the same visit.
+  const [draft, setDraft] = useState<CheckoutDraft>()
   const confirmed = order.data?.status === 'confirmed'
 
   const onBack = () => (canGoBack ? router.history.back() : void router.navigate({ to: '/cart' }))
@@ -156,7 +159,7 @@ function CheckoutPage() {
   ) : isMobile ? (
     <CheckoutMobile cart={cart.data} pending={placeOrder.isPending || order.data?.status === 'pending'} notice={notice} onBack={onBack} onConfirm={onConfirmWallet} />
   ) : (
-    <CheckoutDesktop user={user} cart={cart.data} pending={placeOrder.isPending || order.data?.status === 'pending'} notice={notice} onSubmit={onSubmit} />
+    <CheckoutDesktop user={user} draft={draft} onDraft={setDraft} cart={cart.data} pending={placeOrder.isPending || order.data?.status === 'pending'} notice={notice} onSubmit={onSubmit} />
   )
 
   const dialog = <OrderDialog order={orderId ? order.data : undefined} onClose={closeOrder} />
