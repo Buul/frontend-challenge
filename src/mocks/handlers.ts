@@ -136,7 +136,7 @@ export const handlers: RequestHandler[] = [
   }),
 
   http.get<never, never, NftPage | ApiErrorBody>(`${API}/nfts`, async ({ request }) => {
-    await delay(250)
+    await delay(150)
     if (isScenarioActive('catalog-error')) return serviceUnavailable()
     const { query, errors } = parseListParams(new URL(request.url).searchParams)
     if (Object.keys(errors).length > 0) return validationError(errors)
@@ -168,13 +168,13 @@ export const handlers: RequestHandler[] = [
 
   // Registered after the static `/nfts/*` routes so `featured` and `facets` are never read as ids.
   http.get<{ id: string }, never, NftDetail | ApiErrorBody>(`${API}/nfts/:id`, async ({ params }) => {
-    await delay(300)
+    await delay(150)
     const detail = nftDetails.get(params.id)
     return detail ? HttpResponse.json<NftDetail>(detail) : notFound('NFT não encontrado.')
   }),
 
   http.get<{ id: string }, never, RelatedNftList | ApiErrorBody>(`${API}/nfts/:id/related`, async ({ params }) => {
-    await delay(400)
+    await delay(250)
     if (!nftDetails.has(params.id)) return notFound('NFT não encontrado.')
     return HttpResponse.json<RelatedNftList>({ data: relatedNfts(params.id) })
   }),
@@ -279,7 +279,7 @@ export const handlers: RequestHandler[] = [
   }),
 
   http.get<never, never, Cart | ApiErrorBody>(`${API}/cart`, async ({ request }) => {
-    await delay(200)
+    await delay(150)
     const cart = cartOwner(request)
     if ('error' in cart) return cart.error
     return HttpResponse.json<Cart>(cartStore.get(cart.owner))
