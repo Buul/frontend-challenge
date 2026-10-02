@@ -213,13 +213,18 @@ export type CollectorProfile = {
   ensName: string
   ensSuffix: EnsSuffix
   walletNickname: string
+  /** A `data:` URL of the square avatar image, or `null` when the collector has none. Changed through `/auth/profile/avatar`. */
+  avatarUrl: string | null
 }
 
 /** Body of `PATCH /auth/profile`. Password fields are omitted when the collector is not changing the password. */
-export type ProfileUpdateRequest = CollectorProfile & {
+export type ProfileUpdateRequest = Omit<CollectorProfile, 'avatarUrl'> & {
   currentPassword?: string
   newPassword?: string
 }
+
+/** Body of `PUT /auth/profile/avatar`: a PNG, JPEG or WebP `data:` URL (the client resizes it to 256 px first). */
+export type AvatarUpdateRequest = { image: string }
 
 export type ProfileUpdateResponse = {
   user: User

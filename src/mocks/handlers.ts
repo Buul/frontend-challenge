@@ -23,6 +23,7 @@ import {
   type Session,
   type SessionInfo,
   type SignupRequest,
+  type AvatarUpdateRequest,
   type CollectorProfile,
   type CollectorWallets,
   type WalletUpdateRequest,
@@ -31,8 +32,8 @@ import type { ApiErrorBody } from '@/lib/api/errors'
 import { compareEth, isEthAmount } from '@/lib/eth'
 import { shortenAddress } from '@/lib/format'
 import type { PlaceOrderRequest } from '@/lib/api/orders'
-import { cartItemSchema, cartPromoSchema, cartQuantitySchema, checkoutSchema, EMAIL_PATTERN, loginSchema, profileUpdateSchema, signupSchema, toFieldErrors, walletSchema } from '@/lib/validation'
-import { authenticate, collectorProfile, registerUser, sessionStore, toPublicUser, updateCollectorProfile, verifyCredentials } from './auth'
+import { avatarSchema, cartItemSchema, cartPromoSchema, cartQuantitySchema, checkoutSchema, EMAIL_PATTERN, loginSchema, profileUpdateSchema, signupSchema, toFieldErrors, walletSchema } from '@/lib/validation'
+import { authenticate, collectorProfile, registerUser, sessionStore, setAvatar, toPublicUser, updateCollectorProfile, verifyCredentials } from './auth'
 import { cartStore, GUEST_CART } from './cart-store'
 import { featuredNfts, nftDetails, nfts, relatedNfts } from './data'
 // Applies the persisted live prices and supply to the fixtures before any handler reads them.
@@ -242,6 +243,27 @@ export const handlers: RequestHandler[] = [
     }
 
     return HttpResponse.json<ProfileUpdateResponse>({ user: toPublicUser(result.user), profile: result.profile })
+  }),
+
+  http.put<never, Partial<AvatarUpdateRequest>, CollectorProfile | ApiErrorBody>(`${API}/auth/profile/avatar`, async ({ request }) => {
+    await delay(400)
+    if (isScenarioActive('profile-error')) return serviceUnavailable()
+    const session = authenticate(request)
+    if (!session) return unauthenticated()
+    const parsed = avatarSchema.safeParse(await request.json().catch(() => ({})))
+    if (!parsed.success) return validationError(toFieldErrors(parsed.error), 'Não foi possível usar esta imagem.')
+    setAvatar(session.user.id, parsed.data.image)
+    return HttpResponse.json<CollectorProfile>(collectorProfile(session.user))
+  }),
+
+  // Idempotent: removing an avatar that is not there still answers with the profile.
+  http.delete<never, never, CollectorProfile | ApiErrorBody>(`${API}/auth/profile/avatar`, async ({ request }) => {
+    await delay(300)
+    if (isScenarioActive('profile-error')) return serviceUnavailable()
+    const session = authenticate(request)
+    if (!session) return unauthenticated()
+    setAvatar(session.user.id, null)
+    return HttpResponse.json<CollectorProfile>(collectorProfile(session.user))
   }),
 
   http.get<never, never, Cart | ApiErrorBody>(`${API}/cart`, async ({ request }) => {

@@ -117,10 +117,23 @@ export async function registerUser(input: { name: string; email: string; passwor
   return user
 }
 
+/** Avatars kept apart from the other profile fields: they change on their own endpoint and are much larger. */
+const avatars = persisted<Record<string, string>>(
+  'kurio:mock:avatars',
+  () => ({}),
+  (value) => isRecord(value) && Object.values(value).every((item) => typeof item === 'string'),
+)
+
+export function setAvatar(userId: string, image: string | null) {
+  const { [userId]: _previous, ...rest } = avatars.read()
+  avatars.write(image ? { ...rest, [userId]: image } : rest)
+}
+
 /** Profile shown on `/profile`. Unset collector fields stay empty until the first save. */
 export function collectorProfile(user: UserRecord): CollectorProfile {
   const stored = accountOverrides.read()[user.id]?.profile
   return {
+    avatarUrl: avatars.read()[user.id] ?? null,
     displayName: user.name,
     username: stored?.username ?? '',
     email: user.email,

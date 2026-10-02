@@ -230,3 +230,15 @@ export const toFieldErrors = (error: z.ZodError) =>
       messages?.[0] ? [[field, messages[0]]] : [],
     ),
   )
+
+/** Avatar images the profile accepts, before the client resizes them. */
+export const AVATAR_TYPES = ['image/png', 'image/jpeg', 'image/webp'] as const
+export const AVATAR_MAX_BYTES = 5 * 1024 * 1024
+
+/** `PUT /auth/profile/avatar`: a resized image as a base64 `data:` URL (about 20 kB at 256 px; capped to keep the mock store small). */
+export const avatarSchema = z.object({
+  image: z
+    .string({ error: 'Envie uma imagem.' })
+    .max(400_000, 'A imagem é grande demais. Use uma imagem menor.')
+    .regex(/^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/]+=*$/, 'Use uma imagem PNG, JPG ou WebP.'),
+})

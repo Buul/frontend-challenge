@@ -1,6 +1,6 @@
 import { useForm } from '@tanstack/react-form'
 import { useNavigate } from '@tanstack/react-router'
-import { useEffect, useRef, useState, type ChangeEvent, type ReactNode } from 'react'
+import { useRef, useState, type ChangeEvent, type ReactNode } from 'react'
 import hideIcon from '@/assets/figma/profile-hide.svg'
 import imageIcon from '@/assets/figma/profile-image.svg'
 import arrowIcon from '@/assets/figma/profile-arrow.svg'
@@ -9,12 +9,13 @@ import { InlineAlert, RetryAlert } from '@/components/ui/inline-alert'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useLogout, useSession } from '@/lib/api/auth'
 import { ApiError, getErrorMessage } from '@/lib/api/errors'
-import { useCollectorProfile, useUpdateProfile } from '@/lib/api/profile'
+import { useCollectorProfile, useUpdateAvatar, useUpdateProfile } from '@/lib/api/profile'
 import { ENS_SUFFIXES, type CollectorProfile, type EnsSuffix } from '@/lib/api/types'
 import { authIntent } from '@/lib/auth/auth-dialog'
+import { toSquareDataUrl } from '@/lib/image'
 import { fieldError, firstInvalidField, formErrorMessage, handleAuthSubmit, setServerErrors } from '@/lib/forms'
 import { cn } from '@/lib/utils'
-import { profileFormSchema } from '@/lib/validation'
+import { AVATAR_MAX_BYTES, AVATAR_TYPES, profileFormSchema } from '@/lib/validation'
 
 const FIELDS = [
   'displayName',
@@ -68,15 +69,10 @@ function ProfileEditor({ userId, profile }: { userId: string; profile: Collector
   const logout = useLogout()
   const update = useUpdateProfile(userId)
   const [status, setStatus] = useState('')
-  const [avatar, setAvatar] = useState<string>()
+  const updateAvatar = useUpdateAvatar(userId)
+  const [avatarStatus, setAvatarStatus] = useState<{ message: string; error?: boolean }>()
   const refs = useRef<Partial<Record<FieldName, HTMLInputElement | HTMLSelectElement | null>>>({})
   const focus = (field?: FieldName) => field && refs.current[field]?.focus()
-
-  useEffect(() => {
-    return () => {
-      if (avatar) URL.revokeObjectURL(avatar)
-    }
-  }, [avatar])
 
   const form = useForm({
     defaultValues: {
@@ -122,11 +118,34 @@ function ProfileEditor({ userId, profile }: { userId: string; profile: Collector
     refs.current[field] = node
   }
 
-  const onAvatar = (event: ChangeEvent<HTMLInputElement>) => {
+  const saveAvatar = async (image: string | null) => {
+    try {
+      await updateAvatar.mutateAsync(image)
+      setAvatarStatus({ message: image ? 'Avatar atualizado.' : 'Avatar removido.' })
+    } catch (error) {
+      setAvatarStatus({ message: getErrorMessage(error), error: true })
+    }
+  }
+
+  const onAvatar = async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
     event.target.value = ''
-    if (!file || !file.type.startsWith('image/')) return
-    setAvatar(URL.createObjectURL(file))
+    if (!file) return
+    if (!AVATAR_TYPES.some((type) => type === file.type)) {
+      setAvatarStatus({ message: 'Use uma imagem PNG, JPG ou WebP.', error: true })
+      return
+    }
+    if (file.size > AVATAR_MAX_BYTES) {
+      setAvatarStatus({ message: 'A imagem deve ter até 5 MB.', error: true })
+      return
+    }
+    setAvatarStatus(undefined)
+    const image = await toSquareDataUrl(file).catch(() => undefined)
+    if (!image) {
+      setAvatarStatus({ message: 'Não foi possível ler esta imagem. Tente outra.', error: true })
+      return
+    }
+    await saveAvatar(image)
   }
 
   const onLogout = () => {
@@ -254,28 +273,57 @@ function ProfileEditor({ userId, profile }: { userId: string; profile: Collector
               )}
             </form.Field>
             <Field label="Avatar">
-              <div className="flex items-center gap-6">
-                <span
-                  className={cn(
-                    'grid size-[50px] shrink-0 place-items-center overflow-hidden rounded-full border border-border bg-surface-raised',
-                    avatar ? '' : 'p-3',
-                  )}
-                >
-                  {avatar ? (
-                    <img src={avatar} alt="" className="size-full object-cover" />
-                  ) : (
-                    <img src={imageIcon} alt="" width={20} height={20} />
-                  )}
-                </span>
-                <div className="flex items-center gap-5">
-                  <label className="grid h-10 w-[98px] cursor-pointer place-items-center rounded-[3px] bg-primary text-sm leading-4 font-bold text-primary-foreground">
-                    Alterar
-                    <input type="file" accept="image/*" className="sr-only" onChange={onAvatar} />
-                  </label>
-                  <button type="button" onClick={() => setAvatar(undefined)} className="text-sm leading-4">
-                    Remover
-                  </button>
+              <div className="flex flex-col gap-2">
+                <div className="flex items-center gap-6" aria-busy={updateAvatar.isPending}>
+                  <span
+                    className={cn(
+                      'grid size-[50px] shrink-0 place-items-center overflow-hidden rounded-full border border-border bg-surface-raised',
+                      profile.avatarUrl ? '' : 'p-3',
+                    )}
+                  >
+                    {profile.avatarUrl ? (
+                      <img src={profile.avatarUrl} alt="Seu avatar" width={50} height={50} className="size-full object-cover" />
+                    ) : (
+                      <img src={imageIcon} alt="" width={20} height={20} />
+                    )}
+                  </span>
+                  <div className="flex items-center gap-5">
+                    {/* The label is the visible control; focus lands on the (visually hidden) input, so the ring follows it. */}
+                    <label
+                      className={cn(
+                        'grid h-10 w-[98px] cursor-pointer place-items-center rounded-[3px] bg-primary text-sm leading-4 font-bold text-primary-foreground has-focus-visible:outline-2 has-focus-visible:outline-offset-2 has-focus-visible:outline-primary',
+                        updateAvatar.isPending && 'cursor-wait opacity-60',
+                      )}
+                    >
+                      Alterar
+                      <input
+                        type="file"
+                        accept={AVATAR_TYPES.join(',')}
+                        aria-label="Alterar avatar"
+                        aria-describedby={avatarStatus ? 'profile-avatar-status' : undefined}
+                        disabled={updateAvatar.isPending}
+                        className="sr-only"
+                        onChange={(event) => void onAvatar(event)}
+                      />
+                    </label>
+                    <button
+                      type="button"
+                      aria-label="Remover avatar"
+                      disabled={!profile.avatarUrl || updateAvatar.isPending}
+                      onClick={() => void saveAvatar(null)}
+                      className="text-sm leading-4 disabled:opacity-50"
+                    >
+                      Remover
+                    </button>
+                  </div>
                 </div>
+                <p
+                  id="profile-avatar-status"
+                  role={avatarStatus?.error ? 'alert' : 'status'}
+                  className={cn('text-[13px] leading-4', avatarStatus?.error ? 'text-coral' : 'text-brand')}
+                >
+                  {avatarStatus?.message}
+                </p>
               </div>
             </Field>
           </div>
